@@ -68,7 +68,7 @@
   <input id="rpc-endpoint" type="text" value="https://api.devnet.solana.com">
   <div class="row"><span>SOL balance</span><span class="value" id="out-sol-balance">—</span></div>
   <button id="btn-refresh-sol">Refresh</button>
-  <label for="burn-amount">Burn (SOL, real, irreversible — Solana's own incinerator address)</label>
+  <label for="burn-amount">Burn & commit (SOL, real, irreversible — Solana's own incinerator address, immediately committed as your real AIWA capital)</label>
   <input id="burn-amount" type="number" step="0.001" min="0" placeholder="0.01">
   <button id="btn-burn">Burn</button>
   <div id="burn-result" class="muted"></div>
@@ -78,10 +78,7 @@
   <div class="row"><span>Claimable (not yet spendable)</span><span class="value" id="out-claimable">—</span></div>
   <div class="row"><span class="muted">Total (spendable + claimable)</span><span class="value muted" id="out-balance">—</span></div>
   <button id="btn-claim">Claim</button>
-  <button id="btn-toggle-progress">Start progress loop</button>
-  <label for="commit-amount" style="margin-top:10px">Commit capital after a burn (b)</label>
-  <input id="commit-amount" type="number" step="0.1" min="0" placeholder="10">
-  <button id="btn-commit">Record commitment</button>
+  <p class="muted" style="margin-top:6px">Progression runs automatically while connected — no button needed, just like the original AIWA_chain.</p>
 </section>
 
 <!-- ============ SEND ============ -->
@@ -139,7 +136,6 @@ const REWARD_PARAMS = { alpha: 1.1, beta: 2.2, gamma: 3, C: Math.pow(33, 3), min
 
 const $ = (id) => document.getElementById(id);
 let aiwa = null;
-let progressLoopOn = false;
 let channel = null;
 let displayRefreshTimer = null;
 
@@ -175,6 +171,10 @@ $('btn-connect').addEventListener('click', async () => {
     $('receive-section').hidden = false;
     $('channel-section').hidden = false;
     await refreshLocalState();
+    // Matches AIWA_chain's own original identity.js: progression runs
+    // automatically for as long as you're connected, no manual button.
+    aiwa.startProgressLoop({ onError: (err) => console.error('progress loop:', err) });
+    displayRefreshTimer = setInterval(() => { if (aiwa) refreshLocalState(); }, 5000);
   } catch (err) {
     showError($('connect-error'), err.message);
   }
@@ -184,10 +184,8 @@ $('btn-disconnect').addEventListener('click', async () => {
   await aiwa.disconnect(); // also stops the real progress loop
   aiwa = null;
   channel = null;
-  progressLoopOn = false;
   clearInterval(displayRefreshTimer);
   displayRefreshTimer = null;
-  $('btn-toggle-progress').textContent = 'Start progress loop';
   $('connect-form').hidden = false;
   $('connected-info').hidden = true;
   $('balances-section').hidden = true;
@@ -198,12 +196,15 @@ $('btn-disconnect').addEventListener('click', async () => {
   $('network-status').textContent = '';
 });
 
-$('btn-join-network').addEventListener('click', async () => {
+async function ensureJoinedNetwork() {
+  if (aiwa.replicator) return;
   const transport = new WebrtcTransport();
   await aiwa.joinNetwork(transport);
   window.__aiwaTransport = transport; // exposed for real signaling exchange via devtools/another peer — see README
   $('network-status').textContent = `joined — real selfId: ${transport.selfId}`;
-});
+}
+
+$('btn-join-network').addEventListener('click', ensureJoinedNetwork);
 
 $('btn-refresh-sol').addEventListener('click', async () => {
   try {
@@ -223,17 +224,11 @@ $('btn-burn').addEventListener('click', async () => {
     const solanaWeb3 = await import('https://esm.sh/@solana/web3.js@1.98.0');
     const connection = new solanaWeb3.Connection($('rpc-endpoint').value, 'confirmed');
     const signature = await aiwa.burn(Math.round(sol * 1e9), connection);
-    $('burn-result').textContent = `real burn broadcast: ${signature}`;
+    await refreshLocalState(); // burn() already committed the real capital — reflect it before the success message
+    $('burn-result').textContent = `real burn broadcast & committed: ${signature}`;
   } catch (err) {
     $('burn-result').textContent = `error: ${err.message}`;
   }
-});
-
-$('btn-commit').addEventListener('click', async () => {
-  const b = Number($('commit-amount').value);
-  if (!(b >= 0)) return;
-  await aiwa.recordCommitment({ b });
-  await refreshLocalState();
 });
 
 $('btn-claim').addEventListener('click', async () => {
@@ -241,20 +236,6 @@ $('btn-claim').addEventListener('click', async () => {
   if (Number(claimable) <= 0) return;
   await aiwa.claim(claimable);
   await refreshLocalState();
-});
-
-$('btn-toggle-progress').addEventListener('click', (e) => {
-  progressLoopOn = !progressLoopOn;
-  if (progressLoopOn) {
-    aiwa.startProgressLoop({ onError: (err) => console.error('progress loop:', err) });
-    e.target.textContent = 'Stop progress loop';
-    displayRefreshTimer = setInterval(() => { if (aiwa) refreshLocalState(); }, 5000);
-  } else {
-    aiwa.stopProgressLoop();
-    e.target.textContent = 'Start progress loop';
-    clearInterval(displayRefreshTimer);
-    displayRefreshTimer = null;
-  }
 });
 
 $('btn-send-network').addEventListener('click', async () => {
@@ -342,7 +323,11 @@ $('btn-open-channel').addEventListener('click', async () => {
   const peer = $('channel-peer').value.trim();
   if (!peer) return;
   try {
-    channel = await aiwa.openChannel(peer, { requireNetwork: !!aiwa.replicator });
+    // Opening a channel needs a real path to the peer at least once, to
+    // find them — join automatically rather than making that a separate
+    // manual step. Once open, the channel itself works fully offline.
+    await ensureJoinedNetwork();
+    channel = await aiwa.openChannel(peer);
     $('out-channel-address').textContent = channel.address;
     $('channel-open').hidden = false;
     $('channel-log').textContent = `channel opened for ${peer} — session address ${channel.address}\n`;
