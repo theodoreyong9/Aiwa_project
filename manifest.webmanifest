@@ -1,0 +1,14 @@
+{
+  "name": "AIWA Wallet",
+  "short_name": "AIWA",
+  "description": "A real wallet — connect, balance, burn, claim, send/receive, channels, and contracts. No fixed hosting.",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#100e1c",
+  "theme_color": "#7c5cff",
+  "icons": [
+    { "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" }
+  ]
+}

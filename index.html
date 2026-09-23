@@ -3,7 +3,13 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#7c5cff">
+<meta name="description" content="A real, self-hosted AIWA wallet — connect, balance, burn, claim, send/receive, channels, and contracts. No fixed server.">
 <title>AIWA</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icons/icon-192.png">
+<link rel="apple-touch-icon" href="icons/icon-192.png">
+<link rel="stylesheet" href="style.css">
 <script type="importmap">
 { "imports": {
   "aiwa-lib": "./node_modules/aiwa-lib/src/index.js",
@@ -15,176 +21,197 @@
   "@scure/bip39/": "./node_modules/@scure/bip39/"
 } }
 </script>
-<style>
-  :root { color-scheme: light dark; }
-  body { font: 15px/1.5 -apple-system, system-ui, sans-serif; max-width: 640px; margin: 0 auto; padding: 16px; }
-  h1 { font-size: 20px; margin-bottom: 4px; }
-  h2 { font-size: 15px; margin: 0 0 8px; opacity: 0.7; text-transform: uppercase; letter-spacing: 0.04em; }
-  section { border: 1px solid color-mix(in srgb, currentColor 15%, transparent); border-radius: 10px; padding: 14px; margin-bottom: 14px; }
-  section[hidden] { display: none; }
-  label { display: block; font-size: 13px; opacity: 0.8; margin: 8px 0 3px; }
-  input, textarea, select { width: 100%; box-sizing: border-box; padding: 7px 9px; font: inherit; border-radius: 6px; border: 1px solid color-mix(in srgb, currentColor 25%, transparent); background: transparent; color: inherit; }
-  textarea { font-family: ui-monospace, monospace; font-size: 12px; resize: vertical; }
-  button { padding: 8px 14px; font: inherit; border-radius: 6px; border: 1px solid color-mix(in srgb, currentColor 25%, transparent); background: color-mix(in srgb, currentColor 6%, transparent); color: inherit; cursor: pointer; margin: 4px 6px 4px 0; }
-  button:hover { background: color-mix(in srgb, currentColor 12%, transparent); }
-  button:disabled { opacity: 0.4; cursor: default; }
-  .row { display: flex; justify-content: space-between; align-items: baseline; padding: 4px 0; }
-  .row .value { font-family: ui-monospace, monospace; font-size: 13px; word-break: break-all; text-align: right; max-width: 60%; }
-  .muted { opacity: 0.6; font-size: 12px; }
-  .error { color: #d33; font-size: 13px; margin-top: 6px; }
-  .ok { color: #2a8; font-size: 13px; margin-top: 6px; }
-  #qr { margin: 10px 0; }
-  #qr canvas { border-radius: 8px; }
-  .log { max-height: 140px; overflow-y: auto; font-family: ui-monospace, monospace; font-size: 11px; background: color-mix(in srgb, currentColor 5%, transparent); border-radius: 6px; padding: 8px; }
-</style>
 </head>
 <body>
 
-<h1>AIWA</h1>
-<p class="muted">A real wallet — connect, balance, burn, claim, send/receive. No fixed hosting: this page and every real balance below are yours, offline-capable, peer to peer.</p>
-<p class="muted">
-  <a href="https://github.com/theodoreyong9/Aiwa_project" target="_blank" rel="noopener">Source</a> ·
-  <a href="https://github.com/theodoreyong9/Aiwa_project/blob/main/YELLOWPAPER.md" target="_blank" rel="noopener">Yellow Paper</a> ·
-  <a href="examples/channel-contract.html" target="_blank" rel="noopener">Channel example</a>
-</p>
+<div class="wrap">
 
-<!-- ============ CONNECT ============ -->
-<section id="connect-section">
-  <h2>Connect</h2>
-  <div id="connect-form">
-    <label for="mnemonic">Recover from a real BIP39 mnemonic (optional)</label>
-    <input id="mnemonic" type="text" placeholder="leave empty to generate a brand-new real identity" autocomplete="off">
-    <button id="btn-connect">Connect</button>
-  </div>
-  <div id="connected-info" hidden>
-    <div class="row"><span>Address</span><span class="value" id="out-address"></span></div>
-    <div class="row"><span>Identity id</span><span class="value" id="out-identity-id"></span></div>
-    <button id="btn-disconnect">Disconnect</button>
-    <button id="btn-join-network">Join network</button>
-    <span id="network-status" class="muted"></span>
-  </div>
-  <div id="connect-error" class="error"></div>
-</section>
+<header class="app-header">
+  <div class="brand"><div class="mark"></div><h1>AIWA</h1></div>
+  <p class="tagline">A real wallet — connect, balance, burn, claim, send/receive. No fixed hosting: this page and every real balance below are yours, offline-capable, peer to peer.</p>
+  <p class="links">
+    <a href="https://github.com/theodoreyong9/Aiwa_project" target="_blank" rel="noopener">Source</a> ·
+    <a href="https://github.com/theodoreyong9/Aiwa_project/blob/main/YELLOWPAPER.md" target="_blank" rel="noopener">Yellow Paper</a> ·
+    <a href="examples/channel-contract.html" target="_blank" rel="noopener">Channel example</a>
+  </p>
+</header>
 
-<!-- ============ BALANCES ============ -->
-<section id="balances-section" hidden>
-  <h2>Solana Devnet</h2>
-  <div class="row"><span>SOL balance</span><span class="value" id="out-sol-balance">—</span></div>
-  <button id="btn-refresh-sol">Refresh</button>
-  <label for="burn-amount">Burn & commit (SOL, real, irreversible — Solana's own incinerator address, immediately committed as your real AIWA capital)</label>
-  <input id="burn-amount" type="number" step="0.001" min="0" placeholder="0.01">
-  <button id="btn-burn">Burn</button>
-  <div id="burn-result" class="muted"></div>
+<nav class="tabs" id="app-nav">
+  <button type="button" class="active" data-view="wallet">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7a2 2 0 0 1 2-2h11a2 2 0 0 1 2 2v1"/><path d="M3 7v10a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V10a2 2 0 0 0-2-2H5a2 2 0 0 1-2-2Z"/><circle cx="16.5" cy="13.5" r="1.25" fill="currentColor" stroke="none"/></svg>
+    <span>Wallet</span>
+  </button>
+  <button type="button" data-view="operations">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3 4 7l4 4"/><path d="M4 7h11a4 4 0 0 1 4 4v1"/><path d="M16 21l4-4-4-4"/><path d="M20 17H9a4 4 0 0 1-4-4v-1"/></svg>
+    <span>Operations</span>
+  </button>
+  <button type="button" data-view="channel">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="6" cy="12" r="3"/><circle cx="18" cy="6" r="3"/><circle cx="18" cy="18" r="3"/><path d="M8.6 10.5 15.4 7.5"/><path d="M8.6 13.5 15.4 16.5"/></svg>
+    <span>Channel</span>
+  </button>
+  <button type="button" data-view="contracts">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 8-4 4 4 4"/><path d="m15 8 4 4-4 4"/></svg>
+    <span>Contracts</span>
+  </button>
+</nav>
 
-  <h2 style="margin-top:16px">AIWA</h2>
-  <div class="row"><span>Spendable now</span><span class="value" id="out-spendable">—</span></div>
-  <div class="row"><span>Claimable (not yet spendable)</span><span class="value" id="out-claimable">—</span></div>
-  <div class="row"><span class="muted">Total (spendable + claimable)</span><span class="value muted" id="out-balance">—</span></div>
-  <button id="btn-claim">Claim</button>
-  <p class="muted" style="margin-top:6px">Progression runs automatically while connected — no button needed, just like the original AIWA_chain.</p>
-</section>
+<!-- ============ VIEW: WALLET ============ -->
+<div class="view" id="view-wallet" data-view="wallet">
 
-<!-- ============ SEND ============ -->
-<section id="send-section" hidden>
-  <h2>Send AIWA</h2>
-  <label for="send-to">Recipient identity id</label>
-  <input id="send-to" type="text" placeholder="the recipient's real identity id">
-  <label for="send-amount">Amount (up to what's spendable now — see above)</label>
-  <input id="send-amount" type="text" placeholder="1.5">
-  <button id="btn-send-network">Send over the network</button>
-  <button id="btn-send-offline">Generate offline bundle (QR)</button>
-  <div id="qr"></div>
-  <div id="send-share" hidden>
-    <button id="btn-share">Share…</button>
-    <button id="btn-copy-blob">Copy to clipboard</button>
-  </div>
-  <div id="send-result" class="muted"></div>
-</section>
+  <section id="connect-section">
+    <h2>Connect</h2>
+    <div id="connect-form">
+      <label for="mnemonic">Recover from a real BIP39 mnemonic (optional)</label>
+      <input id="mnemonic" type="text" placeholder="leave empty to generate a brand-new real identity" autocomplete="off">
+      <button id="btn-connect" class="primary">Connect</button>
+    </div>
+    <div id="connected-info" hidden>
+      <div class="row"><span>Address</span><span class="value" id="out-address"></span></div>
+      <div class="row"><span>Identity id</span><span class="value" id="out-identity-id"></span></div>
+      <button id="btn-disconnect">Disconnect</button>
+      <button id="btn-join-network">Join network</button>
+      <span id="network-status" class="muted"></span>
+    </div>
+    <div id="connect-error" class="error"></div>
+  </section>
 
-<!-- ============ RECEIVE ============ -->
-<section id="receive-section" hidden>
-  <h2>Receive</h2>
-  <button id="btn-scan">Scan a QR code</button>
-  <video id="scan-video" hidden playsinline muted style="width:100%;border-radius:8px;"></video>
-  <label for="receive-blob">…or paste a received bundle</label>
-  <textarea id="receive-blob" rows="3"></textarea>
-  <button id="btn-receive">Receive</button>
-  <div id="receive-result" class="muted"></div>
-</section>
+  <section id="balances-section" hidden>
+    <h2>Solana Devnet</h2>
+    <div class="row"><span>SOL balance</span><span class="value" id="out-sol-balance">—</span></div>
+    <button id="btn-refresh-sol">Refresh</button>
+    <label for="burn-amount">Burn & commit (SOL, real, irreversible — Solana's own incinerator address, immediately committed as your real AIWA capital)</label>
+    <input id="burn-amount" type="number" step="0.001" min="0" placeholder="0.01">
+    <button id="btn-burn" class="primary">Burn</button>
+    <div id="burn-result" class="muted"></div>
 
-<!-- ============ WITHDRAW (bearer voucher) ============ -->
-<section id="voucher-section" hidden>
-  <h2>Withdraw — a real bearer QR</h2>
-  <p class="muted">Generates a real withdrawal code redeemable by whoever scans it first — no pre-funding, nothing escrowed. The code can be freely copied; only the first real redemption succeeds.</p>
-  <label for="voucher-amount">Amount</label>
-  <input id="voucher-amount" type="text" placeholder="5.0">
-  <button id="btn-issue-voucher">Create withdrawal QR</button>
-  <div id="voucher-issue-result" class="muted"></div>
-  <div id="voucher-qr"></div>
-  <div id="voucher-share" hidden>
-    <button id="btn-voucher-share">Share…</button>
-    <button id="btn-voucher-copy">Copy to clipboard</button>
-  </div>
+    <h2 style="margin-top:20px">AIWA</h2>
+    <div class="row"><span>Spendable now</span><span class="value" id="out-spendable">—</span></div>
+    <div class="row"><span>Claimable (not yet spendable)</span><span class="value" id="out-claimable">—</span></div>
+    <div class="row"><span class="muted">Total (spendable + claimable)</span><span class="value muted" id="out-balance">—</span></div>
+    <button id="btn-claim" class="primary">Claim</button>
+    <p class="muted" style="margin-top:8px">Progression runs automatically while connected — no button needed, just like the original AIWA_chain.</p>
+  </section>
 
-  <h3 style="margin-top:16px">Redeem a withdrawal code</h3>
-  <button id="btn-scan-voucher">Scan a QR code</button>
-  <video id="voucher-scan-video" hidden playsinline muted style="width:100%;border-radius:8px;"></video>
-  <label for="voucher-redeem-blob">…or paste a withdrawal code</label>
-  <textarea id="voucher-redeem-blob" rows="3"></textarea>
-  <button id="btn-redeem-voucher">Redeem</button>
-  <div id="voucher-redeem-result" class="muted"></div>
-</section>
+</div>
 
-<!-- ============ CHANNEL ============ -->
-<section id="channel-section" hidden>
-  <h2>Channel — sign once, click as many times as you want</h2>
-  <p class="muted">One real signature opens a channel with a peer. No pre-funding, nothing escrowed — every click afterward signs with an already-unlocked session key alone.</p>
-  <label for="channel-peer">Peer identity id</label>
-  <input id="channel-peer" type="text">
-  <button id="btn-open-channel">Open channel</button>
-  <p class="muted" id="channel-disconnect-note" hidden>Still works — an open channel needs no root connection at all, not even to split an amount.</p>
-  <div id="channel-open" hidden>
-    <div class="row"><span>Session address</span><span class="value" id="out-channel-address"></span></div>
-    <div class="row"><span>Owner balance (via this channel)</span><span class="value" id="out-channel-balance">—</span></div>
-    <label for="channel-amount">Amount per click</label>
-    <input id="channel-amount" type="text" placeholder="0.1">
-    <button id="btn-channel-send">Send (click me repeatedly)</button>
-    <div class="log" id="channel-log"></div>
-  </div>
-</section>
+<!-- ============ VIEW: OPERATIONS ============ -->
+<div class="view" id="view-operations" data-view="operations" hidden>
+  <p class="empty-hint" id="operations-empty-hint">Connect your wallet in the Wallet tab first.</p>
 
-<!-- ============ PUBLISH CONTRACT ============ -->
-<section id="publish-section" hidden>
-  <h2>Publish a contract</h2>
-  <p class="muted">Publishes a real, signed, addressable bundle (aiwa-platform's own real publish mechanism) — discoverable by its own address or by yours, real content-addressed dedup and version history included. Runs later in its own isolated, sandboxed context — never inside this wallet's own page, so it can never read your identity here.</p>
-  <label for="contract-name">Name</label>
-  <input id="contract-name" type="text" placeholder="my-token">
-  <label for="contract-version">Version</label>
-  <input id="contract-version" type="text" placeholder="1.0.0" value="1.0.0">
-  <label for="contract-code">A single, self-contained index.html — it runs at its own opaque origin, so it must load its own dependencies from a CDN (e.g. esm.sh), never from this page's local files.</label>
-  <textarea id="contract-code" rows="18"></textarea>
-  <button id="btn-publish-contract">Publish</button>
-  <div id="publish-result" class="muted"></div>
-</section>
+  <section id="send-section" hidden>
+    <h2>Send AIWA</h2>
+    <label for="send-to">Recipient identity id</label>
+    <input id="send-to" type="text" placeholder="the recipient's real identity id">
+    <label for="send-amount">Amount (up to what's spendable now — see Wallet tab)</label>
+    <input id="send-amount" type="text" placeholder="1.5">
+    <button id="btn-send-network" class="primary">Send over the network</button>
+    <button id="btn-send-offline">Generate offline bundle (QR)</button>
+    <div id="qr"></div>
+    <div id="send-share" hidden>
+      <button id="btn-share">Share…</button>
+      <button id="btn-copy-blob">Copy to clipboard</button>
+    </div>
+    <div id="send-result" class="muted"></div>
+  </section>
 
-<!-- ============ BROWSE CONTRACTS ============ -->
-<section id="browse-section" hidden>
-  <h2>Browse contracts</h2>
-  <label for="browse-address">By address</label>
-  <input id="browse-address" type="text" placeholder="contract:<creator identity id>:<name>">
-  <button id="btn-browse-address">Look up</button>
-  <label for="browse-creator" style="margin-top:10px">…or by creator identity id</label>
-  <input id="browse-creator" type="text">
-  <button id="btn-browse-creator">List their contracts</button>
-  <div id="browse-list"></div>
-  <div id="contract-viewer" hidden>
-    <div class="row"><span>Opened</span><span class="value" id="viewer-address"></span></div>
-    <iframe id="contract-frame" sandbox="allow-scripts" title="Published contract, sandboxed" style="width:100%; height:420px; border:1px solid rgba(128,128,128,0.4); border-radius:8px;"></iframe>
-  </div>
-</section>
+  <section id="receive-section" hidden>
+    <h2>Receive</h2>
+    <button id="btn-scan">Scan a QR code</button>
+    <video id="scan-video" hidden playsinline muted style="width:100%;border-radius:8px;"></video>
+    <label for="receive-blob">…or paste a received bundle</label>
+    <textarea id="receive-blob" rows="3"></textarea>
+    <button id="btn-receive" class="primary">Receive</button>
+    <div id="receive-result" class="muted"></div>
+  </section>
+
+  <section id="voucher-section" hidden>
+    <h2>Withdraw — a real bearer QR</h2>
+    <p class="muted">Generates a real withdrawal code redeemable by whoever scans it first — no pre-funding, nothing escrowed. The code can be freely copied; only the first real redemption succeeds.</p>
+    <label for="voucher-amount">Amount</label>
+    <input id="voucher-amount" type="text" placeholder="5.0">
+    <button id="btn-issue-voucher" class="primary">Create withdrawal QR</button>
+    <div id="voucher-issue-result" class="muted"></div>
+    <div id="voucher-qr"></div>
+    <div id="voucher-share" hidden>
+      <button id="btn-voucher-share">Share…</button>
+      <button id="btn-voucher-copy">Copy to clipboard</button>
+    </div>
+
+    <h3>Redeem a withdrawal code</h3>
+    <button id="btn-scan-voucher">Scan a QR code</button>
+    <video id="voucher-scan-video" hidden playsinline muted style="width:100%;border-radius:8px;"></video>
+    <label for="voucher-redeem-blob">…or paste a withdrawal code</label>
+    <textarea id="voucher-redeem-blob" rows="3"></textarea>
+    <button id="btn-redeem-voucher" class="primary">Redeem</button>
+    <div id="voucher-redeem-result" class="muted"></div>
+  </section>
+
+  <section id="history-section" hidden>
+    <h2>History</h2>
+    <button type="button" id="btn-refresh-history" class="ghost">Refresh</button>
+    <div id="history-list"><p class="empty-hint">Nothing yet.</p></div>
+  </section>
+</div>
+
+<!-- ============ VIEW: CHANNEL ============ -->
+<div class="view" id="view-channel" data-view="channel" hidden>
+  <p class="empty-hint" id="channel-empty-hint">Connect your wallet in the Wallet tab first — once a channel is open, it keeps working after disconnecting.</p>
+
+  <section id="channel-section" hidden>
+    <h2>Channel — sign once, click as many times as you want</h2>
+    <p class="muted">One real signature opens a channel with a peer. No pre-funding, nothing escrowed — every click afterward signs with an already-unlocked session key alone.</p>
+    <label for="channel-peer">Peer identity id</label>
+    <input id="channel-peer" type="text">
+    <button id="btn-open-channel" class="primary">Open channel</button>
+    <p class="muted" id="channel-disconnect-note" hidden>Still works — an open channel needs no root connection at all, not even to split an amount.</p>
+    <div id="channel-open" hidden>
+      <div class="row"><span>Session address</span><span class="value" id="out-channel-address"></span></div>
+      <div class="row"><span>Owner balance (via this channel)</span><span class="value" id="out-channel-balance">—</span></div>
+      <label for="channel-amount">Amount per click</label>
+      <input id="channel-amount" type="text" placeholder="0.1">
+      <button id="btn-channel-send" class="primary">Send (click me repeatedly)</button>
+      <div class="log" id="channel-log"></div>
+    </div>
+  </section>
+</div>
+
+<!-- ============ VIEW: CONTRACTS ============ -->
+<div class="view" id="view-contracts" data-view="contracts" hidden>
+  <p class="empty-hint" id="contracts-empty-hint">Connect your wallet in the Wallet tab first.</p>
+
+  <section id="publish-section" hidden>
+    <h2>Publish a contract</h2>
+    <p class="muted">Publishes a real, signed, addressable bundle (aiwa-platform's own real publish mechanism) — discoverable by its own address or by yours, real content-addressed dedup and version history included. Runs later in its own isolated, sandboxed context — never inside this wallet's own page, so it can never read your identity here.</p>
+    <label for="contract-name">Name</label>
+    <input id="contract-name" type="text" placeholder="my-token">
+    <label for="contract-version">Version</label>
+    <input id="contract-version" type="text" placeholder="1.0.0" value="1.0.0">
+    <label for="contract-code">A single, self-contained index.html — it runs at its own opaque origin, so it must load its own dependencies from a CDN (e.g. esm.sh), never from this page's local files.</label>
+    <textarea id="contract-code" rows="18"></textarea>
+    <button id="btn-publish-contract" class="primary">Publish</button>
+    <div id="publish-result" class="muted"></div>
+  </section>
+
+  <section id="browse-section" hidden>
+    <h2>Browse contracts</h2>
+    <label for="browse-address">By address</label>
+    <input id="browse-address" type="text" placeholder="contract:<creator identity id>:<name>">
+    <button id="btn-browse-address" class="primary">Look up</button>
+    <label for="browse-creator" style="margin-top:10px">…or by creator identity id</label>
+    <input id="browse-creator" type="text">
+    <button id="btn-browse-creator" class="primary">List their contracts</button>
+    <div id="browse-list"></div>
+    <div id="contract-viewer" hidden>
+      <div class="row"><span>Opened</span><span class="value" id="viewer-address"></span></div>
+      <iframe id="contract-frame" sandbox="allow-scripts" title="Published contract, sandboxed" style="width:100%; height:420px; border:1px solid rgba(128,128,128,0.4); border-radius:8px;"></iframe>
+    </div>
+  </section>
+</div>
+
+</div><!-- /.wrap -->
 
 <script type="module">
-import { AIWA, encodeOfflineBundle, decodeOfflineBundle } from 'aiwa-lib';
+import { AIWA, encodeOfflineBundle, decodeOfflineBundle, fromUnits } from 'aiwa-lib';
 import { publishBundle, readBundle, latestBundle, listBundlesByAuthor } from 'aiwa-platform';
 import { WebrtcTransport } from 'aiwa-platform';
 
@@ -302,6 +329,34 @@ window.addEventListener('unhandledrejection', (event) => {
   showError($('connect-error'), `Unexpected error: ${event.reason?.message ?? event.reason}`);
 });
 
+// ---------- navigation ----------
+
+function switchView(name) {
+  for (const btn of document.querySelectorAll('#app-nav button')) {
+    btn.classList.toggle('active', btn.dataset.view === name);
+  }
+  for (const view of document.querySelectorAll('.view')) {
+    view.hidden = view.dataset.view !== name;
+  }
+  if (name === 'operations' && aiwa) renderHistory();
+}
+for (const btn of document.querySelectorAll('#app-nav button')) {
+  btn.addEventListener('click', () => switchView(btn.dataset.view));
+}
+
+function setConnectedGates(connected) {
+  $('operations-empty-hint').hidden = connected;
+  $('channel-empty-hint').hidden = connected || !!channel; // an already-open channel stays usable even disconnected
+  $('contracts-empty-hint').hidden = connected;
+  $('send-section').hidden = !connected;
+  $('receive-section').hidden = !connected;
+  $('voucher-section').hidden = !connected;
+  $('history-section').hidden = !connected;
+  $('channel-section').hidden = !connected && !channel; // an already-open channel keeps its section visible even disconnected
+  $('publish-section').hidden = !connected;
+  $('browse-section').hidden = !connected;
+}
+
 async function refreshLocalState() {
   if (!aiwa || !aiwa.identity) return; // nothing to refresh once disconnected — the top wallet display is hidden anyway
   $('out-address').textContent = aiwa.address;
@@ -316,6 +371,92 @@ async function refreshChannelBalance() {
   $('out-channel-balance').textContent = await channel.balance();
 }
 
+// ---------- history ----------
+
+function shortId(id) {
+  if (!id || id.length <= 14) return id ?? '';
+  return `${id.slice(0, 6)}…${id.slice(-4)}`;
+}
+
+function historyRow({ badge, badgeClass, label, detail, when }) {
+  const row = document.createElement('div');
+  row.className = 'history-item';
+  const main = document.createElement('div');
+  main.className = 'hist-main';
+  const labelEl = document.createElement('div');
+  labelEl.className = 'hist-label';
+  if (badge) {
+    const badgeEl = document.createElement('span');
+    badgeEl.className = `hist-badge ${badgeClass}`;
+    badgeEl.textContent = badge;
+    labelEl.append(badgeEl);
+  }
+  labelEl.append(document.createTextNode(label));
+  const detailEl = document.createElement('div');
+  detailEl.className = 'hist-detail';
+  detailEl.textContent = detail;
+  main.append(labelEl, detailEl);
+  const whenEl = document.createElement('div');
+  whenEl.className = 'hist-when';
+  whenEl.textContent = when ? new Date(when).toLocaleString() : '';
+  row.append(main, whenEl);
+  return row;
+}
+
+/** A real, chronological history of this identity's own operations — read directly from the real event log, never a separate ledger kept alongside it. */
+async function renderHistory() {
+  if (!aiwa || !aiwa.identity) return;
+  const list = $('history-list');
+  const myId = aiwa.identity.id;
+
+  const events = [];
+  for await (const event of aiwa.log.since([])) events.push(event);
+  events.sort((a, b) => b.createdAt - a.createdAt);
+
+  const state = await aiwa._materializeWallet();
+  const amountFor = (claimId) => fromUnits(state.conservation.claims[claimId]?.amount ?? 0n);
+
+  const rows = [];
+  for (const event of events) {
+    const p = event.payload;
+    if (!p) continue;
+    if (event.type === 'accrual' && p.domain === myId) {
+      rows.push({ badge: 'commit', badgeClass: 'hist-neutral', label: 'Committed capital', detail: `+${p.b} SOL-equivalent burned & committed`, when: event.createdAt });
+    } else if (event.type === 'claim' && event.author === myId) {
+      rows.push({ badge: 'claim', badgeClass: 'hist-neutral', label: 'Claimed', detail: `${p.amount} AIWA moved from claimable to spendable`, when: event.createdAt });
+    } else if (event.type === 'transfer' && (p.from === myId || p.to === myId)) {
+      const out = p.from === myId;
+      rows.push({
+        badge: out ? 'sent' : 'received', badgeClass: out ? 'hist-out' : 'hist-in',
+        label: out ? 'Sent' : 'Received',
+        detail: `${amountFor(p.claimId)} AIWA ${out ? 'to ' + shortId(p.to) : 'from ' + shortId(p.from)}`,
+        when: event.createdAt,
+      });
+    } else if (event.type === 'delegated-transfer' && (p.from === myId || p.to === myId)) {
+      const out = p.from === myId;
+      rows.push({
+        badge: out ? 'channel' : 'channel', badgeClass: out ? 'hist-out' : 'hist-in',
+        label: out ? 'Sent via channel' : 'Received via channel',
+        detail: `${amountFor(p.claimId)} AIWA ${out ? 'to ' + shortId(p.to) : 'from ' + shortId(p.from)} — no root-key signature needed`,
+        when: event.createdAt,
+      });
+    } else if (event.type === 'voucher-redeem' && p.to === myId) {
+      rows.push({ badge: 'received', badgeClass: 'hist-in', label: 'Redeemed a withdrawal QR', detail: `${amountFor(p.claimId)} AIWA`, when: event.createdAt });
+    }
+  }
+
+  list.replaceChildren();
+  if (rows.length === 0) {
+    const hint = document.createElement('p');
+    hint.className = 'empty-hint';
+    hint.textContent = 'Nothing yet.';
+    list.append(hint);
+    return;
+  }
+  for (const row of rows) list.append(historyRow(row));
+}
+$('btn-refresh-history').addEventListener('click', renderHistory);
+
 $('btn-connect').addEventListener('click', async () => {
   showError($('connect-error'), '');
   try {
@@ -325,13 +466,7 @@ $('btn-connect').addEventListener('click', async () => {
     $('connect-form').hidden = true;
     $('connected-info').hidden = false;
     $('balances-section').hidden = false;
-    $('send-section').hidden = false;
-    $('receive-section').hidden = false;
-    $('voucher-section').hidden = false;
-    $('channel-section').hidden = false;
-    $('channel-disconnect-note').hidden = true;
-    $('publish-section').hidden = false;
-    $('browse-section').hidden = false;
+    setConnectedGates(true);
     await refreshLocalState();
     // Matches AIWA_chain's own original identity.js: progression runs
     // automatically for as long as you're connected, no manual button.
@@ -350,11 +485,7 @@ $('btn-disconnect').addEventListener('click', async () => {
   $('connect-form').hidden = false;
   $('connected-info').hidden = true;
   $('balances-section').hidden = true;
-  $('send-section').hidden = true;
-  $('receive-section').hidden = true;
-  $('voucher-section').hidden = true;
-  $('publish-section').hidden = true;
-  $('browse-section').hidden = true;
+  setConnectedGates(false);
   $('network-status').textContent = '';
   // An already-open channel is deliberately NOT cleared here and its
   // section stays visible: it needs no root connection at all, for
@@ -364,6 +495,7 @@ $('btn-disconnect').addEventListener('click', async () => {
   if (channel) {
     $('channel-section').hidden = false;
     $('channel-disconnect-note').hidden = false;
+    $('channel-empty-hint').hidden = true;
     refreshChannelBalance();
   }
 });
@@ -417,6 +549,7 @@ $('btn-send-network').addEventListener('click', async () => {
     await aiwa.send($('send-to').value.trim(), $('send-amount').value.trim());
     await refreshLocalState();
     $('send-result').textContent = 'sent over the network';
+    renderHistory();
   } catch (err) {
     $('send-result').textContent = `error: ${err.message}`;
   }
@@ -433,6 +566,7 @@ $('btn-send-offline').addEventListener('click', async () => {
     $('send-share').hidden = false;
     await refreshLocalState(); // completes before the success message, so the display never lags what it reports
     $('send-result').textContent = 'offline bundle ready — no network was used to create it';
+    renderHistory();
     try {
       await renderQr(lastOfflineBlob);
     } catch (qrErr) {
@@ -486,6 +620,7 @@ $('btn-receive').addEventListener('click', async () => {
     $('receive-blob').value = '';
     await refreshLocalState();
     $('receive-result').textContent = 'received and verified — real signature and causal checks passed';
+    renderHistory();
   } catch (err) {
     $('receive-result').textContent = `rejected: ${err.message}`;
   }
@@ -582,7 +717,7 @@ function renderContractList(items) {
   }
   for (const item of items) {
     const row = document.createElement('div');
-    row.className = 'row';
+    row.className = 'contract-list-row';
     const label = document.createElement('span');
     label.textContent = `${item.name} v${item.version} — ${item.domain}`;
     const btn = document.createElement('button');
@@ -641,6 +776,7 @@ $('btn-issue-voucher').addEventListener('click', async () => {
     $('voucher-share').hidden = false;
     await refreshLocalState();
     $('voucher-issue-result').textContent = 'withdrawal QR ready — whoever scans it first gets it';
+    renderHistory();
     try {
       await renderQr(lastVoucherBlob, 'voucher-qr');
     } catch (qrErr) {
@@ -667,6 +803,7 @@ $('btn-redeem-voucher').addEventListener('click', async () => {
     $('voucher-redeem-blob').value = '';
     await refreshLocalState();
     $('voucher-redeem-result').textContent = 'redeemed — real signature and causal checks passed';
+    renderHistory();
   } catch (err) {
     $('voucher-redeem-result').textContent = `rejected: ${err.message}`;
   }
@@ -676,6 +813,12 @@ $('btn-scan-voucher').addEventListener('click', async () => {
   const ok = await scanQrInto($('voucher-scan-video'), $('voucher-redeem-blob'));
   if (!ok) $('voucher-redeem-result').textContent = 'Camera QR scanning is not supported in this browser — paste the code instead.';
 });
+
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('./sw.js').catch((err) => console.error('service worker registration failed:', err));
+  });
+}
 </script>
 </body>
 </html>

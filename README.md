@@ -59,6 +59,44 @@ python3 -m http.server 8080   # from this repo's own root — ES modules and Ind
 ```
 then open `http://127.0.0.1:8080/index.html`.
 
+## Interface: four tabs, installable
+
+The page is organized into four tabs (`Wallet`, `Operations`,
+`Channel`, `Contracts`) behind a responsive nav — icon+label side by
+side on wider screens, icon-above-label once the viewport gets narrow
+enough that the two wouldn't both fit. `Wallet` holds Connect and both
+balance panels; `Operations` holds Send/Receive/Withdraw plus a real
+**History** panel (below); `Channel` and `Contracts` are unchanged in
+substance, just their own tab now.
+
+**History** is not a separate ledger kept alongside the wallet — it's
+read directly from the real event log (`aiwa.log.since([])`) on every
+view, filtered to the events that actually belong to the connected
+identity (commitments, claims, transfers in and out, channel sends,
+voucher redemptions) and resolved against the real, materialized
+conservation state for each one's actual amount, never a value stored
+redundantly. There is no separate source of truth to drift from what
+the wallet itself already computes.
+
+It's also a real PWA: `manifest.webmanifest` + `sw.js` make it
+installable (a real "Add to Home Screen" / install prompt, standalone
+window, its own icon — generated deterministically by
+`scripts/generate-icons.mjs`, the same hand-rolled, dependency-free PNG
+encoder AIWA_chain's own icon generator uses, adapted to this page's
+own accent colors). **Deliberately different from AIWA_chain's own
+service worker**: that one hand-enumerates every real file it ships,
+which works because `public/app`/`public/core` are this project's own
+files. Here, `aiwa-core`/`aiwa-lib`/`aiwa-platform` are real git
+dependencies under `node_modules/` whose exact file set can change
+between installs — a hand-enumerated precache list would have a real
+chance of 404ing on some future dependency update and failing the
+entire service worker install. Instead, `sw.js` precaches only the
+small, guaranteed-stable shell (`index.html`, the manifest, the
+stylesheet, the icons) and caches every other same-origin file
+opportunistically as it's actually fetched, network-first — after one
+normal online visit, everything this page actually needed is already
+cached, and a later offline visit is served from it.
+
 ## What's real here
 
 - **Connect / disconnect**: derives or generates a real Ed25519
@@ -191,7 +229,12 @@ Everything else described above — connect/disconnect, claim, send/receive
 (network and offline), the channel — was verified live, end to end, in
 a real Chromium browser via Playwright, including the real VDF
 progress loop actually growing claimable over real wall-clock time,
-and a real forged-bundle rejection.
+and a real forged-bundle rejection. The tabbed navigation, History
+(rendering real commit/claim/send/receive/channel/voucher-redeem
+entries with real, resolved amounts after a real funding+send+receive
+sequence), and the PWA manifest + service worker (resolves, registers,
+and reaches an `active` state) were all verified the same way, in the
+same real browser.
 
 ## Real economic parameters
 

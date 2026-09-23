@@ -23,10 +23,16 @@ jobs:
         with:
           node-version: 22
       - run: npm install
+      - name: Regenerate PWA icons (deterministic — checked in, this just verifies)
+        run: |
+          node scripts/generate-icons.mjs
+          git diff --exit-code -- icons/
       - name: Assemble the static site
         run: |
           mkdir _site
-          cp index.html _site/
+          cp index.html style.css manifest.webmanifest sw.js _site/
+          cp -r icons _site/icons
+          cp -r examples _site/examples
           cp -r node_modules _site/node_modules
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
