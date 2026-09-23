@@ -12,11 +12,15 @@ Two sections are new: Delegation (§17) and Bearer vouchers (§18), neither
 of which existed in v2.0. A first pass at this revision condensed §11.1,
 §12.1, §15.1, §15.2, and §16.1 out entirely without flagging the omission
 — caught on review and restored here, updated rather than pasted back
-unchanged: §12.1 documents a real regression (incremental wallet
-materialization, present in v2.0, absent from the current `aiwa-core`),
-and §16.1 documents a real capability v2.0 could point to
-(cross-runtime Rust verification) that no longer exists as a checked
-artifact in the current codebase.
+unchanged: §12.1 documents a real, still-unaddressed regression
+(incremental wallet materialization, present in v2.0, absent from the
+current `aiwa-core`), and §16.1 documented a real capability v2.0 could
+point to (cross-runtime Rust verification) that no longer existed as a
+checked artifact in the current codebase — **since restored**, and now
+covering a wider, more current surface than v2.0's own version did (a
+real, fully signed event, not a simplified stand-in; a byte-identical,
+independently re-derived Ed25519 signature, not merely one that
+verifies).
 
 ---
 
@@ -57,7 +61,8 @@ layer:
   content-addressed contract publishing, delegation, and bearer
   vouchers. Depends on nothing of its own — only `@noble/curves`,
   `@noble/hashes`, `@scure/bip39`, and an optional `@solana/web3.js`
-  peer dependency for the genesis commitment (§8). 339 passing tests.
+  peer dependency for the genesis commitment (§8). 340 passing tests
+  (339 pure-JS, plus a real Rust build+run cross-check — §16.1).
 - **`aiwa-platform`** — distributed infrastructure with no protocol
   logic of its own: WebRTC transport, a replicator that syncs an
   `aiwa-core` event log between peers, capability-gated data stores, a
@@ -66,10 +71,42 @@ layer:
 - **`aiwa-lib`** — the public, developer-facing facade. A real wallet
   API (`AIWA`) composing `aiwa-core`'s validation with `aiwa-platform`'s
   transport, and a smart-contract/token authoring SDK
-  (`defineContract`/`Contract`/`signedAction`). 27 passing tests.
+  (`defineContract`/`Contract`/`signedAction`). 31 passing tests.
 - **`AIWA_project`** — one concrete deployment: a single static page, no
   build step, no fixed server, wiring `aiwa-lib`'s API directly to DOM
   elements.
+
+```
+       ┌────────────────────────────────────────────────┐
+       │ AIWA_project                                   │
+       │ one concrete deployment (a single static page, │
+       │ no build step, no fixed server)                │
+       └────────────────────────────────────────────────┘
+                                │
+                                │  imports all three, directly
+                                ▼
+              ┌──────────────────────────────────┐
+              ▼                                  ▼
+┌───────────────────────────┐      ┌───────────────────────────┐
+│ aiwa-lib                  │      │ aiwa-platform             │
+│ public wallet API (AIWA), │      │ transport, replication,   │
+│ Channel, contract SDK     │      │ capability-gated storage, │
+│                           │      │ bundle publishing         │
+└───────────────────────────┘      └───────────────────────────┘
+              │                                  │
+              └────────────────┬─────────────────┘
+                               ▼
+       ┌──────────────────────────────────────────────┐
+       │ aiwa-core                                    │
+       │ the protocol itself: identity, event log,    │
+       │ progression, accrual, conservation, Mirror,  │
+       │ Causal Tick, contracts, delegation, vouchers │
+       │                                              │
+       │ depends on nothing of its own - only         │
+       │ @noble/curves, @noble/hashes, @scure/bip39,  │
+       │ optional @solana/web3.js                     │
+       └──────────────────────────────────────────────┘
+```
 
 A consequence worth stating plainly: nothing above `aiwa-core` may alter
 what counts as a valid state transition. `aiwa-lib`'s `Channel` and
@@ -329,6 +366,36 @@ Reconciliation is signature, ancestry, and Mirror-observation
 verification over newly available evidence — never a question of clock
 authority.
 
+```
+Earth               e0 ── e1 ── e2 ── e3 ── e4
+domain              (VDF-bound progression, entirely alone —
+                      Mars need not exist for any of this)
+
+Mars                                        m0 ── m1 ── m2
+domain                                      (its own, independent
+                                              progression — no
+                                              awareness of Earth)
+
+                                                      │
+                          a real connection opens ────┘
+                          (WebRTC, a file, anything)
+                                                      │
+                                                      ▼
+Earth               e0 ── e1 ── e2 ── e3 ── e4 ─┐
+domain                                          ├── r (Mirror reception
+Mars                             m0 ── m1 ── m2 ┘     commitment: "I
+domain                                                 observed these")
+```
+
+`r` is not a merge and not a correction of either chain — `e4` and
+`m2` both remain exactly what they were. `r` is a new, additional
+event: a signed statement, by whichever domain builds it, of what it
+has now observed of the other. Nothing about `e0..e4` or `m0..m2`
+changes; nothing is renumbered, rewritten, or invalidated. Independent
+histories stay independent, and become causally correlated the moment
+they interact — nothing here forces a shared timeline, a shared
+height, or a shared next event.
+
 **Channel versus data.** A transport session (`aiwa-platform`'s
 `WebrtcTransport`, or any real link) is inherently temporary. Once real
 data has crossed it, that data is verified and stored durably by each
@@ -527,23 +594,51 @@ contract" card and a `scanContractSpecs` listing. Neither has an
 `aiwa-lib`/`AIWA_project` equivalent yet — `contract-registry.js` is
 real and tested, unused by anything above it in the current stack.
 
-### 16.1 Cross-runtime interoperability — present in v2.0, not carried forward
+### 16.1 Cross-runtime interoperability — restored, and now covers more than v2.0's own version did
 
 v2.0 claimed a confirmed, independent Rust reproduction
 (`interop/rust-vdf/`) of every primitive an external chain's own
-adapter would need — SHA-256 canonicalization, practical Wesolowski
-verification, Ed25519 signature verification against a different
-library — checked byte-identical against the real JS output. **Verified
-directly: no such directory, and no cross-runtime test, exists in the
-current `aiwa-core`.** This was not silently dropped by omission in
-v2.0's own reasoning — the underlying algorithms (§3, §6.1, Ed25519)
-are unchanged and remain, in principle, exactly as reproducible in
-another language as before — but the *specific, independent
-confirmation* v2.0 could point to no longer exists as a checked
-artifact. Restoring it is real, straightforward, not-yet-done work: a
-second-language reimplementation of §3's canonicalization, §6.1's
-Wesolowski verification, and Ed25519 signing/verification, checked
-byte-identical against `aiwa-core`'s own real output.
+adapter would need. An earlier revision of this document verified
+directly that no such directory, and no cross-runtime test, existed in
+`aiwa-core` at the time — a real, honestly-documented gap, not silently
+dropped by omission. **That gap is now closed.** `aiwa-core/interop/rust-vdf/`
+is a real, independent Rust implementation, ported from AIWA_chain's
+own (the project this codebase was itself ported from) after directly
+verifying that `vdf.js`, `weighted-median.js`, `conservation.js`'s
+split invariant, `mirror.js`'s monotonicity check, `relative-rate.js`'s
+central ratio, `causal-tick.js`'s consistency check,
+`wesolowski-vdf.js`, `bigint-math.js`, `generous-transfer.js`, and
+§7's own reward formula (`reward.js`/`fixed-point-math.js`) are
+algorithmically identical between the two codebases.
+
+`event.js`'s own canonical id format (§3) genuinely differs from
+AIWA_chain's — this project's real, wider
+`domain`/`author`/`authorPublicKey`/`parents`/`type`/`payload`/
+`createdAt` shape, not a bare `{parents,payload}` pair — so that part
+is a real, new implementation, checked against a real, fully signed
+`aiwa-core` event rather than a simplified stand-in. It goes further
+than v2.0's own version did: alongside recomputing the canonical id,
+`ed25519-dalek` (a genuinely different library from this project's own
+`@noble/curves`) independently *re-signs* the identical message with
+the identical raw secret-key bytes and checks the result byte-for-byte
+against the real signature `@noble/curves` produced. Since Ed25519
+signing is deterministic (RFC 8032), this is a stronger claim than
+mere verification: two independent, conforming implementations must
+produce the *identical* signature, not merely one that happens to pass
+the other's own check.
+
+`test/rust-interop.test.mjs` builds the real Rust binary, runs it, and
+compares its output against the live JS modules' own output for the
+identical test vectors, byte for byte — including §7's reward formula
+for two real test vectors (a basic case and a full year of continuous
+progression, ~112M epochs), both matching AIWA_chain's own
+independently-documented values digit for digit. Skips gracefully
+(never fails) if no Rust toolchain is available in a given environment
+— see `aiwa-core/interop/rust-vdf/README.md` for exactly what this
+does and does not claim, and what remains real, separate, undone work
+(a genuine multi-runtime implementation of the whole protocol, as
+opposed to this cross-check of its most fundamental, custom
+computations).
 
 ---
 
@@ -711,10 +806,13 @@ event log is the safe default for a contract's own internal state.
 | Multi-file bundle publishing (§19) | `aiwa-platform` | `src/bundle.js`, `src/serve-worker.js` |
 | Public wallet API | `aiwa-lib` | `src/wallet.js` (`AIWA`) |
 | Smart-contract/token SDK | `aiwa-lib` | `src/contract.js` |
+| Cross-runtime interoperability (§16.1) | `aiwa-core` | `interop/rust-vdf/` (Rust), `test/rust-interop.test.mjs` |
 | One concrete deployment | `AIWA_project` | `index.html` |
 
 ## Status
 
-339 passing tests (`aiwa-core`), 72 (`aiwa-platform`), 27 (`aiwa-lib`).
-Every package is independently, publicly testable; none depends on a
-shared, centrally-hosted server to run its own suite.
+340 passing tests (`aiwa-core`, including a real Rust build+run
+cross-check when a Rust toolchain is available), 72 (`aiwa-platform`),
+31 (`aiwa-lib`). Every package is independently, publicly testable;
+none depends on a shared, centrally-hosted server to run its own
+suite.

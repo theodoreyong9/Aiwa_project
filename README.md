@@ -14,6 +14,43 @@ conservation, delegation, bearer vouchers, and everything else that
 lives in `aiwa-core` rather than in this page — see
 [`YELLOWPAPER.md`](./YELLOWPAPER.md).
 
+## Where this sits
+
+```
+       ┌────────────────────────────────────────────────┐
+       │ AIWA_project  <-- you are here                 │
+       │ one concrete deployment (a single static page, │
+       │ no build step, no fixed server)                │
+       └────────────────────────────────────────────────┘
+                                │
+                                │  imports all three, directly
+                                ▼
+              ┌──────────────────────────────────┐
+              ▼                                  ▼
+┌───────────────────────────┐      ┌───────────────────────────┐
+│ aiwa-lib                  │      │ aiwa-platform             │
+│ public wallet API (AIWA), │      │ transport, replication,   │
+│ Channel, contract SDK     │      │ capability-gated storage, │
+│                           │      │ bundle publishing         │
+└───────────────────────────┘      └───────────────────────────┘
+              │                                  │
+              └────────────────┬─────────────────┘
+                               ▼
+       ┌──────────────────────────────────────────────┐
+       │ aiwa-core                                    │
+       │ the protocol itself: identity, event log,    │
+       │ progression, accrual, conservation, Mirror,  │
+       │ Causal Tick, contracts, delegation, vouchers │
+       │                                              │
+       │ depends on nothing of its own - only         │
+       │ @noble/curves, @noble/hashes, @scure/bip39,  │
+       │ optional @solana/web3.js                     │
+       └──────────────────────────────────────────────┘
+```
+
+This page never reimplements protocol logic — everything it does is a
+direct call into `aiwa-lib`'s API, wired straight to DOM elements.
+
 ## Running it
 
 ```
@@ -51,7 +88,16 @@ then open `http://127.0.0.1:8080/index.html`.
   prior sync would need, encoded as a compact string. "Max" fills in
   exactly what's genuinely spendable, never the inflated total that
   also includes not-yet-claimed value (see aiwa-lib's own README for
-  the real bug this distinction fixed).
+  the real bug this distinction fixed). **The live-network path had two
+  real bugs** (`aiwa-lib`'s own `send()` never actually published new
+  events to an already-connected peer, and even after that fix, never
+  bundled the full ancestor chain a peer without prior sync needed) —
+  found and fixed in `aiwa-lib`, then re-verified directly against
+  THIS page's own "Join network"/"Send over the network" buttons: two
+  real, separate browser contexts, real WebRTC, peers connected before
+  any funding or sending happened (the exact ordering that was
+  silently broken before), a real send through the actual UI button,
+  and the recipient's own real balance updating correctly.
 - **Receive**: pastes or scans (via the browser's native
   `BarcodeDetector`, where supported) a real offline bundle and appends
   it — real signature and causal verification, identical to any other
