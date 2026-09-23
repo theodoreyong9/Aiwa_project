@@ -66,8 +66,28 @@ The page is organized into four tabs (`Wallet`, `Operations`,
 side on wider screens, icon-above-label once the viewport gets narrow
 enough that the two wouldn't both fit. `Wallet` holds Connect and both
 balance panels; `Operations` holds Send/Receive/Withdraw plus a real
-**History** panel (below); `Channel` and `Contracts` are unchanged in
-substance, just their own tab now.
+**History** panel (below); `Contracts` is unchanged in substance, just
+its own tab now.
+
+**`Channel` is a real, standalone wallet once open** — not just
+Send. Opening a channel needs the root key once (its one-time
+delegation); every real capability below it needs no root connection
+at all afterward, exactly mirroring `aiwa-lib`'s own `Channel` API:
+Send, **Claim** (moves currently-claimable value into a real,
+spendable claim for the real owner), **Receive a bundle** (accepts an
+already-signed incoming transfer — this one never actually needed a
+channel at all, since `aiwa.receiveOfflineBundle()` never signs with
+your own key, but lives here so every disconnected-capable action is
+in one place), **Withdraw** (issue a real bearer QR redeemable by
+whoever scans it first, and redeem one, both through the channel),
+and **Publish a contract** (through the channel's own session
+identity — see `aiwa-lib`'s own README for the honest limit this
+carries: discoverable by address, but not via "list by creator" for
+your root id, since the real cryptographic author is the channel's
+session identity here). Verified live, through this exact UI, fully
+disconnected: claim, receive, issue+redeem a voucher, and publish (and
+have it show up in `Contracts`' own browse-by-address) all work with
+no root identity connected.
 
 **History** is not a separate ledger kept alongside the wallet — it's
 read directly from the real event log (`aiwa.log.since([])`) on every
@@ -226,7 +246,10 @@ library. Two concrete, honest consequences:
   opaque, isolated origin, checked directly rather than assumed.
 
 Everything else described above — connect/disconnect, claim, send/receive
-(network and offline), the channel — was verified live, end to end, in
+(network and offline), and the channel's full set of capabilities
+(send, claim, receive, issue+redeem a voucher, publish a contract, all
+fully disconnected from the root identity) — was verified live, end to
+end, in
 a real Chromium browser via Playwright, including the real VDF
 progress loop actually growing claimable over real wall-clock time,
 and a real forged-bundle rejection. The tabbed navigation, History

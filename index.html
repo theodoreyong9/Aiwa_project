@@ -171,6 +171,52 @@
       <input id="channel-amount" type="text" placeholder="0.1">
       <button id="btn-channel-send" class="primary">Send (click me repeatedly)</button>
       <div class="log" id="channel-log"></div>
+
+      <h3>Claim</h3>
+      <p class="muted">Moves currently-claimable value into a real, spendable claim for the real owner — no root-key signature needed.</p>
+      <label for="channel-claim-amount">Amount to claim</label>
+      <input id="channel-claim-amount" type="text" placeholder="2.5">
+      <button id="btn-channel-claim" class="primary">Claim</button>
+      <div id="channel-claim-result" class="muted"></div>
+
+      <h3>Receive a bundle</h3>
+      <p class="muted">Accepts an already-signed incoming bundle — never signs with your own key, so this works fully disconnected too.</p>
+      <button id="btn-channel-scan-receive">Scan a QR code</button>
+      <video id="channel-receive-scan-video" hidden playsinline muted style="width:100%;border-radius:8px;"></video>
+      <label for="channel-receive-blob">…or paste a received bundle</label>
+      <textarea id="channel-receive-blob" rows="3"></textarea>
+      <button id="btn-channel-receive" class="primary">Receive</button>
+      <div id="channel-receive-result" class="muted"></div>
+
+      <h3>Withdraw — a real bearer QR</h3>
+      <p class="muted">Generates a real withdrawal code redeemable by whoever scans it first, through this channel — no pre-funding, nothing escrowed.</p>
+      <label for="channel-voucher-amount">Amount</label>
+      <input id="channel-voucher-amount" type="text" placeholder="5.0">
+      <button id="btn-channel-issue-voucher" class="primary">Create withdrawal QR</button>
+      <div id="channel-voucher-issue-result" class="muted"></div>
+      <div id="channel-voucher-qr"></div>
+      <div id="channel-voucher-share" hidden>
+        <button id="btn-channel-voucher-share">Share…</button>
+        <button id="btn-channel-voucher-copy">Copy to clipboard</button>
+      </div>
+      <h4>Redeem a withdrawal code</h4>
+      <button id="btn-channel-scan-voucher">Scan a QR code</button>
+      <video id="channel-voucher-scan-video" hidden playsinline muted style="width:100%;border-radius:8px;"></video>
+      <label for="channel-voucher-redeem-blob">…or paste a withdrawal code</label>
+      <textarea id="channel-voucher-redeem-blob" rows="3"></textarea>
+      <button id="btn-channel-redeem-voucher" class="primary">Redeem</button>
+      <div id="channel-voucher-redeem-result" class="muted"></div>
+
+      <h3>Publish a contract</h3>
+      <p class="muted">Publishes through this channel's own session identity — works fully disconnected too. Honest limit: discoverable by address, but "list by creator" for your root id won't find it (real, cryptographic authorship is the channel's session identity here) — see this app's README.</p>
+      <label for="channel-contract-name">Name</label>
+      <input id="channel-contract-name" type="text" placeholder="my-token">
+      <label for="channel-contract-version">Version</label>
+      <input id="channel-contract-version" type="text" placeholder="1.0.0" value="1.0.0">
+      <label for="channel-contract-code">A single, self-contained index.html</label>
+      <textarea id="channel-contract-code" rows="10"></textarea>
+      <button id="btn-channel-publish-contract" class="primary">Publish</button>
+      <div id="channel-publish-result" class="muted"></div>
     </div>
   </section>
 </div>
@@ -316,6 +362,7 @@ $('contract-code').value = STARTER_CONTRACT_TEMPLATE;
 
 let aiwa = null;
 let channel = null;
+let channelOwnerId = null; // captured at openChannel() time — aiwa.identity becomes null on disconnect, but channel operations (claim/publish) still need the real owner's id
 let displayRefreshTimer = null;
 
 function showError(el, message) { el.textContent = message ? String(message) : ''; }
@@ -422,8 +469,14 @@ async function renderHistory() {
     if (!p) continue;
     if (event.type === 'accrual' && p.domain === myId) {
       rows.push({ badge: 'commit', badgeClass: 'hist-neutral', label: 'Committed capital', detail: `+${p.b} SOL-equivalent burned & committed`, when: event.createdAt });
-    } else if (event.type === 'claim' && event.author === myId) {
-      rows.push({ badge: 'claim', badgeClass: 'hist-neutral', label: 'Claimed', detail: `${p.amount} AIWA moved from claimable to spendable`, when: event.createdAt });
+    } else if ((event.type === 'claim' || event.type === 'delegated-claim') && p.domain === myId) {
+      const viaChannel = event.type === 'delegated-claim';
+      rows.push({
+        badge: 'claim', badgeClass: 'hist-neutral',
+        label: viaChannel ? 'Claimed via channel' : 'Claimed',
+        detail: `${p.amount} AIWA moved from claimable to spendable${viaChannel ? ' — no root-key signature needed' : ''}`,
+        when: event.createdAt,
+      });
     } else if (event.type === 'transfer' && (p.from === myId || p.to === myId)) {
       const out = p.from === myId;
       rows.push({
@@ -440,7 +493,7 @@ async function renderHistory() {
         detail: `${amountFor(p.claimId)} AIWA ${out ? 'to ' + shortId(p.to) : 'from ' + shortId(p.from)} — no root-key signature needed`,
         when: event.createdAt,
       });
-    } else if (event.type === 'voucher-redeem' && p.to === myId) {
+    } else if ((event.type === 'voucher-redeem' || event.type === 'delegated-voucher-redeem') && p.to === myId) {
       rows.push({ badge: 'received', badgeClass: 'hist-in', label: 'Redeemed a withdrawal QR', detail: `${amountFor(p.claimId)} AIWA`, when: event.createdAt });
     }
   }
@@ -479,7 +532,11 @@ $('btn-connect').addEventListener('click', async () => {
 
 $('btn-disconnect').addEventListener('click', async () => {
   await aiwa.disconnect(); // also stops the real progress loop
-  aiwa = null;
+  // aiwa itself is deliberately NOT nulled here: aiwa.log (and
+  // receiveOfflineBundle(), which only ever appends to that log) were
+  // never tied to connection state — see aiwa-lib's own README. Every
+  // gate elsewhere already checks aiwa.identity (cleared by
+  // disconnect()), not aiwa's own truthiness, so this stays safe.
   clearInterval(displayRefreshTimer);
   displayRefreshTimer = null;
   $('connect-form').hidden = false;
@@ -644,6 +701,7 @@ $('btn-open-channel').addEventListener('click', async () => {
     // manual step. Once open, the channel itself works fully offline.
     await ensureJoinedNetwork();
     channel = await aiwa.openChannel(peer);
+    channelOwnerId = aiwa.identity.id;
     $('out-channel-address').textContent = channel.address;
     $('channel-open').hidden = false;
     $('channel-log').textContent = `channel opened for ${peer} — session address ${channel.address}\n`;
@@ -677,6 +735,97 @@ $('btn-channel-send').addEventListener('click', async () => {
     }
   } catch (err) {
     $('channel-log').textContent += `error: ${err.message}\n`;
+  }
+});
+
+$('btn-channel-claim').addEventListener('click', async () => {
+  const amount = $('channel-claim-amount').value.trim();
+  if (!amount) return;
+  try {
+    await channel.claim(amount);
+    await refreshChannelBalance();
+    $('channel-claim-result').textContent = `claimed ${amount} — no root-key signature needed`;
+  } catch (err) {
+    $('channel-claim-result').textContent = `error: ${err.message}`;
+  }
+});
+
+$('btn-channel-receive').addEventListener('click', async () => {
+  try {
+    const bundle = decodeOfflineBundle($('channel-receive-blob').value.trim());
+    await aiwa.receiveOfflineBundle(bundle);
+    $('channel-receive-blob').value = '';
+    await refreshChannelBalance();
+    $('channel-receive-result').textContent = 'received and verified — real signature and causal checks passed';
+  } catch (err) {
+    $('channel-receive-result').textContent = `error: ${err.message}`;
+  }
+});
+$('btn-channel-scan-receive').addEventListener('click', async () => {
+  const ok = await scanQrInto($('channel-receive-scan-video'), $('channel-receive-blob'));
+  if (!ok) $('channel-receive-result').textContent = 'Camera QR scanning is not supported in this browser — paste the bundle text instead.';
+});
+
+let lastChannelVoucherBlob = null;
+$('btn-channel-issue-voucher').addEventListener('click', async () => {
+  const amount = $('channel-voucher-amount').value.trim();
+  if (!amount) return;
+  try {
+    // Real and final the moment this resolves — rendering the QR is a
+    // separate, best-effort display step, same as the root-level flow.
+    const voucher = await channel.issueVoucher(amount);
+    lastChannelVoucherBlob = encodeOfflineBundle(voucher);
+    $('channel-voucher-share').hidden = false;
+    await refreshChannelBalance();
+    $('channel-voucher-issue-result').textContent = 'withdrawal QR ready — whoever scans it first gets it';
+    try {
+      await renderQr(lastChannelVoucherBlob, 'channel-voucher-qr');
+    } catch (qrErr) {
+      $('channel-voucher-issue-result').textContent += ` (QR image unavailable: ${qrErr.message} — use Share/Copy instead)`;
+    }
+  } catch (err) {
+    $('channel-voucher-issue-result').textContent = `error: ${err.message}`;
+  }
+});
+$('btn-channel-voucher-share').addEventListener('click', async () => {
+  if (navigator.share) await navigator.share({ text: lastChannelVoucherBlob, title: 'AIWA withdrawal' });
+  else $('channel-voucher-issue-result').textContent = 'Web Share not supported here — use Copy instead.';
+});
+$('btn-channel-voucher-copy').addEventListener('click', async () => {
+  await navigator.clipboard.writeText(lastChannelVoucherBlob);
+  $('channel-voucher-issue-result').textContent = 'copied to clipboard';
+});
+
+$('btn-channel-redeem-voucher').addEventListener('click', async () => {
+  try {
+    const voucher = decodeOfflineBundle($('channel-voucher-redeem-blob').value.trim());
+    await channel.redeemVoucher(voucher);
+    $('channel-voucher-redeem-blob').value = '';
+    await refreshChannelBalance();
+    $('channel-voucher-redeem-result').textContent = 'redeemed — real signature and causal checks passed, landed in the real owner\'s identity';
+  } catch (err) {
+    $('channel-voucher-redeem-result').textContent = `rejected: ${err.message}`;
+  }
+});
+$('btn-channel-scan-voucher').addEventListener('click', async () => {
+  const ok = await scanQrInto($('channel-voucher-scan-video'), $('channel-voucher-redeem-blob'));
+  if (!ok) $('channel-voucher-redeem-result').textContent = 'Camera QR scanning is not supported in this browser — paste the code instead.';
+});
+
+$('btn-channel-publish-contract').addEventListener('click', async () => {
+  const name = $('channel-contract-name').value.trim();
+  const version = $('channel-contract-version').value.trim() || '1.0.0';
+  const code = $('channel-contract-code').value;
+  if (!name || !code.trim()) return;
+  try {
+    const domain = `contract:${channelOwnerId}:${slugify(name)}`;
+    const { manifestEventId } = await publishBundle(channel.identity, channel.log, domain, {
+      name, version, files: [{ path: 'index.html', content: code }],
+    });
+    $('channel-publish-result').textContent = `published — address: ${domain} (manifest ${manifestEventId})`;
+    $('browse-address').value = domain;
+  } catch (err) {
+    $('channel-publish-result').textContent = `error: ${err.message}`;
   }
 });
 
