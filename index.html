@@ -63,9 +63,7 @@
 
 <!-- ============ BALANCES ============ -->
 <section id="balances-section" hidden>
-  <h2>Solana</h2>
-  <label for="rpc-endpoint">RPC endpoint</label>
-  <input id="rpc-endpoint" type="text" value="https://api.devnet.solana.com">
+  <h2>Solana Devnet</h2>
   <div class="row"><span>SOL balance</span><span class="value" id="out-sol-balance">—</span></div>
   <button id="btn-refresh-sol">Refresh</button>
   <label for="burn-amount">Burn & commit (SOL, real, irreversible — Solana's own incinerator address, immediately committed as your real AIWA capital)</label>
@@ -222,10 +220,12 @@ async function ensureJoinedNetwork() {
 
 $('btn-join-network').addEventListener('click', ensureJoinedNetwork);
 
+const SOLANA_DEVNET_RPC = 'https://api.devnet.solana.com';
+
 $('btn-refresh-sol').addEventListener('click', async () => {
   try {
     const solanaWeb3 = await import('https://esm.sh/@solana/web3.js@1.98.0');
-    const connection = new solanaWeb3.Connection($('rpc-endpoint').value, 'confirmed');
+    const connection = new solanaWeb3.Connection(SOLANA_DEVNET_RPC, 'confirmed');
     const lamports = await aiwa.solBalance(connection);
     $('out-sol-balance').textContent = `${lamports / 1e9} SOL`;
   } catch (err) {
@@ -238,7 +238,7 @@ $('btn-burn').addEventListener('click', async () => {
   if (!(sol > 0)) return;
   try {
     const solanaWeb3 = await import('https://esm.sh/@solana/web3.js@1.98.0');
-    const connection = new solanaWeb3.Connection($('rpc-endpoint').value, 'confirmed');
+    const connection = new solanaWeb3.Connection(SOLANA_DEVNET_RPC, 'confirmed');
     const signature = await aiwa.burn(Math.round(sol * 1e9), connection);
     await refreshLocalState(); // burn() already committed the real capital — reflect it before the success message
     $('burn-result').textContent = `real burn broadcast & committed: ${signature}`;
