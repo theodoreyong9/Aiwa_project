@@ -63,6 +63,24 @@ then open `http://127.0.0.1:8080/index.html`.
   once open: clicking **Disconnect** does not stop it — a click that
   needs splitting a claim into the exact amount still works, real
   delegated split and all, with no root key involved for any amount.
+- **Publish a contract / Browse contracts**: publishes a real, signed,
+  addressable bundle via `aiwa-platform`'s own real `publishBundle` —
+  real content-addressed dedup, real version history, a real fork
+  surfaced rather than silently resolved. The address bakes in your
+  real identity id (`contract:<your id>:<name>`), and any bundle is
+  independently discoverable by its own address or by its creator's
+  real id (`listBundlesByAuthor` — no new protocol, since every
+  event's author is already cryptographically verified) even without
+  that convention. **Opening** a published contract loads it into a
+  real sandboxed `<iframe>` — `sandbox="allow-scripts"` with NO
+  `allow-same-origin` — a genuinely different, opaque browser origin
+  with zero access to this page's identity or storage, enforced by the
+  browser itself, not by any code this project wrote. A contract can
+  therefore be arbitrary, untrusted code: the isolation is real, not a
+  convention anyone publishing here has to honor. The starter template
+  (a real, working mint/transfer token using `aiwa-lib`'s own
+  `defineContract`/`Contract`/`signedAction` SDK) generates its own,
+  separate identity the instant it opens — it can never see yours.
 
 ## What isn't verified here, and why
 
@@ -85,6 +103,18 @@ library. Two concrete, honest consequences:
   render — but the visual QR canvas has not been confirmed to actually
   draw. A QR rendering failure is deliberately non-fatal: the send
   already succeeded, and `Share`/`Copy` remain available regardless.
+- **The starter contract template's own imports** point at this same
+  site's real, already-deployed `node_modules/aiwa-lib`/`aiwa-core`
+  files (`https://theodoreyong9.github.io/Aiwa_project/node_modules/...`)
+  — real, live URLs (confirmed reachable once this repo's own Pages
+  deploy is live), but this environment's egress policy blocks
+  `github.io` too, so a published contract's own code actually
+  *running* inside its sandboxed iframe was not exercised here. What
+  *was* verified live: publishing (a real signed bundle, a real
+  derived address), discovery by address and by creator, and the
+  iframe genuinely receiving the right `srcdoc` with a confirmed
+  `sandbox="allow-scripts"` and no `allow-same-origin` — a real,
+  opaque, isolated origin, checked directly rather than assumed.
 
 Everything else described above — connect/disconnect, claim, send/receive
 (network and offline), the channel — was verified live, end to end, in

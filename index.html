@@ -125,8 +125,39 @@
   </div>
 </section>
 
+<!-- ============ PUBLISH CONTRACT ============ -->
+<section id="publish-section" hidden>
+  <h2>Publish a contract</h2>
+  <p class="muted">Publishes a real, signed, addressable bundle (aiwa-platform's own real publish mechanism) — discoverable by its own address or by yours, real content-addressed dedup and version history included. Runs later in its own isolated, sandboxed context — never inside this wallet's own page, so it can never read your identity here.</p>
+  <label for="contract-name">Name</label>
+  <input id="contract-name" type="text" placeholder="my-token">
+  <label for="contract-version">Version</label>
+  <input id="contract-version" type="text" placeholder="1.0.0" value="1.0.0">
+  <label for="contract-code">A single, self-contained index.html — it runs at its own opaque origin, so it must load its own dependencies from a CDN (e.g. esm.sh), never from this page's local files.</label>
+  <textarea id="contract-code" rows="18"></textarea>
+  <button id="btn-publish-contract">Publish</button>
+  <div id="publish-result" class="muted"></div>
+</section>
+
+<!-- ============ BROWSE CONTRACTS ============ -->
+<section id="browse-section" hidden>
+  <h2>Browse contracts</h2>
+  <label for="browse-address">By address</label>
+  <input id="browse-address" type="text" placeholder="contract:<creator identity id>:<name>">
+  <button id="btn-browse-address">Look up</button>
+  <label for="browse-creator" style="margin-top:10px">…or by creator identity id</label>
+  <input id="browse-creator" type="text">
+  <button id="btn-browse-creator">List their contracts</button>
+  <div id="browse-list"></div>
+  <div id="contract-viewer" hidden>
+    <div class="row"><span>Opened</span><span class="value" id="viewer-address"></span></div>
+    <iframe id="contract-frame" sandbox="allow-scripts" title="Published contract, sandboxed" style="width:100%; height:420px; border:1px solid rgba(128,128,128,0.4); border-radius:8px;"></iframe>
+  </div>
+</section>
+
 <script type="module">
 import { AIWA, encodeOfflineBundle, decodeOfflineBundle } from 'aiwa-lib';
+import { publishBundle, readBundle, latestBundle, listBundlesByAuthor } from 'aiwa-platform';
 import { WebrtcTransport } from 'aiwa-platform';
 
 // A real deployment must choose its own real economic parameters —
@@ -135,6 +166,99 @@ import { WebrtcTransport } from 'aiwa-platform';
 const REWARD_PARAMS = { alpha: 1.1, beta: 2.2, gamma: 3, C: Math.pow(33, 3), minQ: 1 };
 
 const $ = (id) => document.getElementById(id);
+
+// A real, working starter — the exact mint/transfer pattern aiwa-lib's
+// own contract.js test suite proves (owner-gated mint, real balance
+// checks on transfer, a real embedded signature per action so a
+// forged payload.from is rejected — see contract.js's own header for
+// why a plain, unverified `from` field is forgeable). Runs at its own
+// opaque origin (this iframe's sandbox has no allow-same-origin), so
+// it generates its OWN identity — it can never see this wallet's.
+// HONEST LIMIT: an in-memory EventLog — an opaque origin can't
+// reliably keep IndexedDB, so state resets each time this is opened;
+// a real deployment publishing its OWN origin (a real domain, not a
+// sandboxed iframe) can use a persistent one instead.
+const STARTER_CONTRACT_TEMPLATE = `<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>my-token</title>
+<script type="importmap">
+{ "imports": {
+  "aiwa-core": "https://theodoreyong9.github.io/Aiwa_project/node_modules/aiwa-core/src/index.js",
+  "aiwa-lib": "https://theodoreyong9.github.io/Aiwa_project/node_modules/aiwa-lib/src/index.js",
+  "@noble/curves/": "https://theodoreyong9.github.io/Aiwa_project/node_modules/@noble/curves/",
+  "@noble/hashes/": "https://theodoreyong9.github.io/Aiwa_project/node_modules/@noble/hashes/",
+  "@scure/bip39": "https://theodoreyong9.github.io/Aiwa_project/node_modules/@scure/bip39/index.js",
+  "@scure/bip39/": "https://theodoreyong9.github.io/Aiwa_project/node_modules/@scure/bip39/"
+} }
+<\/script>
+<style>body { font: 14px/1.5 -apple-system, system-ui, sans-serif; padding: 12px; }</style>
+</head>
+<body>
+<h3>my-token</h3>
+<div id="out">connecting…</div>
+<button id="mint" hidden>Mint 100 to self (owner only)</button>
+<button id="transfer" hidden>Transfer 10 to a random new identity</button>
+<script type="module">
+import { EventLog, generateIdentity } from 'aiwa-core';
+import { defineContract, Contract, signedAction, verifySignedAction } from 'aiwa-lib';
+
+function myToken({ owner, cap }) {
+  return defineContract({
+    initialState: () => ({ balances: {}, minted: 0n }),
+    handlers: {
+      async mint(state, event) {
+        if (!(await verifySignedAction(event.payload))) return state;
+        const { from, to, amount } = event.payload;
+        if (from !== owner) return state;
+        const amt = BigInt(amount);
+        if (state.minted + amt > cap) return state;
+        return { ...state, minted: state.minted + amt, balances: { ...state.balances, [to]: (state.balances[to] ?? 0n) + amt } };
+      },
+      async transfer(state, event) {
+        if (!(await verifySignedAction(event.payload))) return state;
+        const { from, to, amount } = event.payload;
+        const amt = BigInt(amount);
+        const fromBalance = state.balances[from] ?? 0n;
+        if (fromBalance < amt) return state;
+        return { ...state, balances: { ...state.balances, [from]: fromBalance - amt, [to]: (state.balances[to] ?? 0n) + amt } };
+      },
+    },
+  });
+}
+
+const log = new EventLog();
+const me = await generateIdentity();
+const definition = myToken({ owner: me.id, cap: 1000n });
+const contract = new Contract({ identity: me, log, domain: 'my-token', definition });
+
+async function refresh() {
+  const state = await contract.state();
+  document.getElementById('out').textContent =
+    'my identity: ' + me.id + ' | my balance: ' + (state.balances[me.id] ?? 0n) + ' | minted so far: ' + state.minted;
+}
+
+document.getElementById('mint').hidden = false;
+document.getElementById('transfer').hidden = false;
+document.getElementById('mint').addEventListener('click', async () => {
+  const payload = await signedAction(me, { from: me.id, to: me.id, amount: '100' });
+  await contract.dispatch('mint', payload);
+  await refresh();
+});
+document.getElementById('transfer').addEventListener('click', async () => {
+  const someoneElse = await generateIdentity();
+  const payload = await signedAction(me, { from: me.id, to: someoneElse.id, amount: '10' });
+  await contract.dispatch('transfer', payload);
+  await refresh();
+});
+await refresh();
+<\/script>
+</body>
+</html>
+`;
+$('contract-code').value = STARTER_CONTRACT_TEMPLATE;
+
 let aiwa = null;
 let channel = null;
 let displayRefreshTimer = null;
@@ -177,6 +301,8 @@ $('btn-connect').addEventListener('click', async () => {
     $('receive-section').hidden = false;
     $('channel-section').hidden = false;
     $('channel-disconnect-note').hidden = true;
+    $('publish-section').hidden = false;
+    $('browse-section').hidden = false;
     await refreshLocalState();
     // Matches AIWA_chain's own original identity.js: progression runs
     // automatically for as long as you're connected, no manual button.
@@ -197,6 +323,8 @@ $('btn-disconnect').addEventListener('click', async () => {
   $('balances-section').hidden = true;
   $('send-section').hidden = true;
   $('receive-section').hidden = true;
+  $('publish-section').hidden = true;
+  $('browse-section').hidden = true;
   $('network-status').textContent = '';
   // An already-open channel is deliberately NOT cleared here and its
   // section stays visible: it needs no root connection at all, for
@@ -381,6 +509,89 @@ $('btn-channel-send').addEventListener('click', async () => {
     }
   } catch (err) {
     $('channel-log').textContent += `error: ${err.message}\n`;
+  }
+});
+
+function slugify(name) {
+  return name.trim().toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '') || 'contract';
+}
+
+$('btn-publish-contract').addEventListener('click', async () => {
+  if (!aiwa || !aiwa.identity) {
+    $('publish-result').textContent = 'error: connect first — publishing signs the bundle with your real identity.';
+    return;
+  }
+  const name = $('contract-name').value.trim();
+  const version = $('contract-version').value.trim() || '1.0.0';
+  const code = $('contract-code').value;
+  if (!name || !code.trim()) return;
+  try {
+    // The address bakes in the creator's real id directly — "find by
+    // creator" works even without scanning (listBundlesByAuthor below
+    // covers the general case: any domain, not just this convention).
+    const domain = `contract:${aiwa.identity.id}:${slugify(name)}`;
+    const { manifestEventId } = await publishBundle(aiwa.identity, aiwa.log, domain, {
+      name, version, files: [{ path: 'index.html', content: code }],
+    });
+    $('publish-result').textContent = `published — address: ${domain} (manifest ${manifestEventId})`;
+    $('browse-address').value = domain;
+  } catch (err) {
+    $('publish-result').textContent = `error: ${err.message}`;
+  }
+});
+
+function renderContractList(items) {
+  const list = $('browse-list');
+  list.innerHTML = '';
+  if (items.length === 0) {
+    list.textContent = 'nothing found — either nothing published there, or it hasn\'t synced to you yet.';
+    return;
+  }
+  for (const item of items) {
+    const row = document.createElement('div');
+    row.className = 'row';
+    const label = document.createElement('span');
+    label.textContent = `${item.name} v${item.version} — ${item.domain}`;
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.textContent = 'Open';
+    btn.addEventListener('click', async () => {
+      try {
+        const bundle = item.files ? item : await readBundle(aiwa.log, item.manifestEventId);
+        if (!bundle || !bundle.files['index.html']) {
+          list.textContent = 'error: no index.html in this bundle, or not fully synced yet.';
+          return;
+        }
+        $('viewer-address').textContent = item.domain;
+        $('contract-frame').srcdoc = bundle.files['index.html'];
+        $('contract-viewer').hidden = false;
+      } catch (err) {
+        list.textContent = `error: ${err.message}`;
+      }
+    });
+    row.append(label, btn);
+    list.append(row);
+  }
+}
+
+$('btn-browse-address').addEventListener('click', async () => {
+  const domain = $('browse-address').value.trim();
+  if (!domain || !aiwa) return;
+  try {
+    const bundle = await latestBundle(aiwa.log, domain);
+    renderContractList(bundle ? [{ domain, name: bundle.name, version: bundle.version, files: bundle.files }] : []);
+  } catch (err) {
+    $('browse-list').textContent = `error: ${err.message}`;
+  }
+});
+
+$('btn-browse-creator').addEventListener('click', async () => {
+  const creator = $('browse-creator').value.trim();
+  if (!creator || !aiwa) return;
+  try {
+    renderContractList(await listBundlesByAuthor(aiwa.log, creator));
+  } catch (err) {
+    $('browse-list').textContent = `error: ${err.message}`;
   }
 });
 </script>
