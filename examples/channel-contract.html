@@ -1,0 +1,147 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Channel contract example</title>
+<script type="importmap">
+{ "imports": {
+  "aiwa-core": "https://theodoreyong9.github.io/Aiwa_project/node_modules/aiwa-core/src/index.js",
+  "aiwa-lib": "https://theodoreyong9.github.io/Aiwa_project/node_modules/aiwa-lib/src/index.js",
+  "aiwa-platform": "https://theodoreyong9.github.io/Aiwa_project/node_modules/aiwa-platform/src/index.js",
+  "@noble/curves/": "https://theodoreyong9.github.io/Aiwa_project/node_modules/@noble/curves/",
+  "@noble/hashes/": "https://theodoreyong9.github.io/Aiwa_project/node_modules/@noble/hashes/",
+  "@scure/bip39": "https://theodoreyong9.github.io/Aiwa_project/node_modules/@scure/bip39/index.js",
+  "@scure/bip39/": "https://theodoreyong9.github.io/Aiwa_project/node_modules/@scure/bip39/"
+} }
+</script>
+<style>
+  body { font: 14px/1.5 -apple-system, system-ui, sans-serif; padding: 14px; max-width: 560px; margin: 0 auto; }
+  h3 { margin: 18px 0 6px; }
+  button { padding: 6px 12px; margin: 4px 6px 4px 0; }
+  .log { max-height: 160px; overflow-y: auto; font-family: ui-monospace, monospace; font-size: 11px; background: rgba(128,128,128,0.08); border-radius: 6px; padding: 8px; white-space: pre-wrap; }
+  .row { display: flex; justify-content: space-between; padding: 3px 0; }
+  .value { font-family: ui-monospace, monospace; }
+</style>
+</head>
+<body>
+
+<h1>A contract using its own Channel, with its own transport</h1>
+<p>
+  Everything on this page runs at its own opaque, sandboxed origin — it
+  has no access to whatever wallet published or opened it. It generates
+  two of its own identities, gives each its own real, independent
+  <code>WebrtcTransport</code>, and opens a real, delegated
+  <code>Channel</code> from one to the other. This is real
+  <code>aiwa-lib</code> code, not a simulation of it.
+</p>
+
+<h3>1. Two independent identities, each with their own transport</h3>
+<button id="btn-setup">Set up Alice and Bob</button>
+<div id="setup-log" class="log"></div>
+
+<h3>2. A real Channel, opened over a real WebRTC connection</h3>
+<button id="btn-fund" disabled>Fund Alice (real recordCommitment + progression, no Solana burn needed for this demo)</button>
+<button id="btn-open-channel" disabled>Open a channel: Alice → Bob</button>
+<div class="row"><span>Alice — spendable</span><span class="value" id="alice-balance">—</span></div>
+<div class="row"><span>Bob — balance</span><span class="value" id="bob-balance">—</span></div>
+
+<h3>3. Click to send — no further signature from Alice's root key after this</h3>
+<button id="btn-channel-send" disabled>Send 0.05 (click me repeatedly)</button>
+<div id="channel-log" class="log"></div>
+
+<script type="module">
+import { AIWA, Channel } from 'aiwa-lib';
+import { WebrtcTransport } from 'aiwa-platform';
+
+// The same placeholder rewardParams aiwa-core's own tests use — real
+// math, not a real deployment's own chosen economic model.
+const REWARD_PARAMS = { alpha: 1.1, beta: 2.2, gamma: 3, C: Math.pow(33, 3), minQ: 1 };
+
+const $ = (id) => document.getElementById(id);
+let alice, bob, channel;
+
+function log(el, text) {
+  el.textContent += text + '\n';
+  el.scrollTop = el.scrollHeight;
+}
+
+async function refreshBalances() {
+  $('alice-balance').textContent = await alice.spendableBalance();
+  $('bob-balance').textContent = await bob.balance();
+}
+
+$('btn-setup').addEventListener('click', async () => {
+  $('btn-setup').disabled = true;
+  alice = new AIWA({ rewardParams: REWARD_PARAMS });
+  bob = new AIWA({ rewardParams: REWARD_PARAMS });
+  const aliceId = await alice.connect();
+  const bobId = await bob.connect();
+  log($('setup-log'), `Alice: ${aliceId.identityId}`);
+  log($('setup-log'), `Bob:   ${bobId.identityId}`);
+
+  // Each gets its OWN, real, independent WebrtcTransport — nothing
+  // shared between them except the signaling exchange below, exactly
+  // like two real, separate devices.
+  const aliceTransport = new WebrtcTransport();
+  const bobTransport = new WebrtcTransport();
+  await alice.joinNetwork(aliceTransport);
+  await bob.joinNetwork(bobTransport);
+  log($('setup-log'), `Alice's transport selfId: ${aliceTransport.selfId}`);
+  log($('setup-log'), `Bob's transport selfId:   ${bobTransport.selfId}`);
+
+  // Real signaling — on this demo page both sides happen to be
+  // reachable directly, so the offer/answer blobs are passed without a
+  // manual copy/paste step; in a real, separate-device deployment this
+  // exact blob is what you'd copy/paste, QR, or relay by hand.
+  const offer = await aliceTransport.createOfferFor(bobTransport.selfId);
+  const answer = await bobTransport.acceptOffer(offer);
+  await aliceTransport.completeConnection(bobTransport.selfId, answer);
+
+  const deadline = Date.now() + 8000;
+  while (Date.now() < deadline) {
+    if (aliceTransport.peers().includes(bobTransport.selfId)) break;
+    await new Promise((r) => setTimeout(r, 200));
+  }
+  const connected = aliceTransport.peers().includes(bobTransport.selfId);
+  log($('setup-log'), connected ? 'real WebRTC data channel: OPEN' : 'real WebRTC data channel: FAILED to open');
+
+  $('btn-fund').disabled = !connected;
+  await refreshBalances();
+});
+
+$('btn-fund').addEventListener('click', async () => {
+  $('btn-fund').disabled = true;
+  // Real recordCommitment + real VDF progression — the same mechanism
+  // burn() drives on a live deployment; skipping the Solana broadcast
+  // here so this demo runs with no external network dependency at all.
+  await alice.recordCommitment({ b: 100 });
+  for (let i = 0; i < 5; i++) await alice.advanceProgress({ vdfIterations: 2000 });
+  const claimable = await alice.claimable();
+  await alice.claim(claimable);
+  await refreshBalances();
+  $('btn-open-channel').disabled = false;
+});
+
+$('btn-open-channel').addEventListener('click', async () => {
+  $('btn-open-channel').disabled = true;
+  const bobId = bob.identity.id;
+  channel = await alice.openChannel(bobId); // uses the real, already-joined network above to find Bob
+  log($('channel-log'), `channel opened — real session address ${channel.address}`);
+  $('btn-channel-send').disabled = false;
+});
+
+$('btn-channel-send').addEventListener('click', async () => {
+  $('btn-channel-send').disabled = true; // real double-click guard — channel.send() picks the same spendable claim until the state refresh below lands
+  try {
+    await channel.send('0.05');
+    await refreshBalances();
+    log($('channel-log'), `click: sent 0.05 — Alice's root key was not touched`);
+  } catch (err) {
+    log($('channel-log'), `click failed: ${err.message}`);
+  }
+  $('btn-channel-send').disabled = false;
+});
+</script>
+</body>
+</html>

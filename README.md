@@ -96,6 +96,17 @@ then open `http://127.0.0.1:8080/index.html`.
   `defineContract`/`Contract`/`signedAction` SDK) generates its own,
   separate identity the instant it opens — it can never see yours.
 
+  A published contract isn't limited to single, one-shot transfers —
+  [`examples/channel-contract.html`](examples/channel-contract.html)
+  is a real, standalone demo of a contract that opens its own real
+  delegated `Channel` (see above) over its own, independent
+  `WebrtcTransport`, entirely separate from whatever wallet published
+  or opened it: two of its own identities, a real signaling exchange,
+  a real `openChannel()`, and repeated real `channel.send()` clicks —
+  no simulation. Verified live via Playwright: a real WebRTC data
+  channel opens, funding happens, the channel opens, and each click
+  moves real value with the recipient's balance updating correctly.
+
 ## What isn't verified here, and why
 
 This page was built and tested in a sandboxed environment whose own
