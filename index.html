@@ -91,7 +91,6 @@
   <input id="send-to" type="text" placeholder="the recipient's real identity id">
   <label for="send-amount">Amount (up to what's spendable now — see above)</label>
   <input id="send-amount" type="text" placeholder="1.5">
-  <button id="btn-send-max" type="button">Max</button>
   <button id="btn-send-network">Send over the network</button>
   <button id="btn-send-offline">Generate offline bundle (QR)</button>
   <div id="qr"></div>
@@ -256,10 +255,6 @@ $('btn-toggle-progress').addEventListener('click', (e) => {
     clearInterval(displayRefreshTimer);
     displayRefreshTimer = null;
   }
-});
-
-$('btn-send-max').addEventListener('click', async () => {
-  $('send-amount').value = await aiwa.spendableBalance();
 });
 
 $('btn-send-network').addEventListener('click', async () => {
