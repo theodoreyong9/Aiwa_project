@@ -3,14 +3,20 @@
 **Causal Coordination and Local Value Accrual for Partition-Tolerant Networks**
 Version 3.0 — formal specification, reference implementation
 
-This is a revision of the original AIWA_chain Yellow Paper (v2.0), updated
-for the current, four-repository architecture. Sections carried forward
-describe mechanisms independently confirmed still present and tested in
-the current codebase; sections marked **updated** describe a mechanism
-that was redesigned, not merely relocated, during that split — the
-formula or field shape changed, not just the file path. Two sections are
-new: Delegation (§17) and Bearer vouchers (§18), neither of which existed
-in v2.0.
+This is a revision of the original AIWA_chain Yellow Paper (v2.0), not a
+copy of it — every section below was checked against the current
+codebase, not carried over on trust. Sections marked **updated** describe
+a mechanism that was redesigned, not merely relocated, during the split
+into four repositories — the formula or field shape genuinely changed.
+Two sections are new: Delegation (§17) and Bearer vouchers (§18), neither
+of which existed in v2.0. A first pass at this revision condensed §11.1,
+§12.1, §15.1, §15.2, and §16.1 out entirely without flagging the omission
+— caught on review and restored here, updated rather than pasted back
+unchanged: §12.1 documents a real regression (incremental wallet
+materialization, present in v2.0, absent from the current `aiwa-core`),
+and §16.1 documents a real capability v2.0 could point to
+(cross-runtime Rust verification) that no longer exists as a checked
+artifact in the current codebase.
 
 ---
 
@@ -253,10 +259,30 @@ regression against the original design and reverted before ship.
 
 $R$ is linear in $b$: absent a genesis cost, splitting capital across
 identities would not reduce total accrual. A per-identity activation
-cost makes churn strictly costlier, not free — see v2.0 §8.1's own
-churn-profitability calculator (`churn-analysis.js`, unchanged,
-deployment-specific, never a general guarantee for any given parameter
-tuple).
+cost makes churn strictly costlier, not free.
+
+### 8.1 Whether churn pays
+
+Existence of a real cost is not the same claim as sufficiency.
+`churn-analysis.js`'s own `compareChurnVsStay` compares one domain that
+commits once and matures for the full span against one that restarts
+every $k$ epochs, repeatedly re-entering at low $q_{\text{total}}$
+where $r$'s own denominator (§7) is smallest:
+
+$$\text{stay} = r(S, N, N, 0) - \mathrm{cost}(0) \qquad \text{churn}(k) = \left\lfloor \frac{N}{k} \right\rfloor \cdot \big[r(S, k, k, 0) - \mathrm{cost}(\text{slot at cycle start})\big]$$
+
+With zero real cost, churn wins outright; with a real, deliberately-chosen
+cost curve, churn nets negative while staying nets positive — the
+identical $r$, the only real difference being $\mathrm{cost}(\cdot)$'s own
+magnitude. `findMostProfitableChurnInterval` sweeps $k$ over a real
+candidate range to find an attacker's own real best case, rather than
+checking one interval and declaring victory. This is present, unchanged
+in purpose, in the current `aiwa-core` — a real calculator, computed per
+deployment's own chosen $(\alpha,\beta,\gamma,C)$ and cost curve, never a
+general proof that any given tuple is safe. Because §7's own formula
+changed (patience rate $T$, restructured denominator), a v2.0-era churn
+result does not carry over numerically — the calculator must be re-run
+against the current `reward()`, not assumed from the old one.
 
 **External dependency, unchanged.** Broadcasting a burn requires
 reaching a centralized, Earth-hosted RPC endpoint over real internet —
@@ -307,7 +333,29 @@ authority.
 `WebrtcTransport`, or any real link) is inherently temporary. Once real
 data has crossed it, that data is verified and stored durably by each
 side independently; losing the session never loses what already
-crossed.
+crossed. Re-establishing a channel after a gap is a real, ordinary
+event, not a failure — the reconciliation logic it feeds (§4) is
+agnostic to which transport carried the bytes.
+
+### 11.1 Positioning
+
+Published interplanetary-cryptocurrency proposals generally extend one
+Earth-anchored consensus chain across the latency gap — DTN transport,
+timelocks widened to light-time, federated or merge-mined settlement —
+leaving consensus and issuance untouched. This transfers already-created
+value under latency; it leaves creation itself dominated by whichever
+side has more compute (mining from Mars against Earth's hashpower is
+acknowledged, in that literature, as structurally unprofitable).
+
+AIWA removes value creation from any consensus chain: $\mathrm{epoch}_D$
+requires no awareness of one. Reconciliation (§4, §14) is additive and
+informational only. This closes the specific asymmetry above; it does
+not address real byte transport under latency (deliberately pluggable
+— `aiwa-platform`'s own `Replicator`/transport separation, shared
+identically by `WebrtcTransport` and any future transport, with room
+for a real DTN or dedicated-hardware transport later without touching
+reconciliation logic at all) nor an exchange rate between economies
+that grew apart.
 
 ## 12. Explicit non-claims
 
@@ -317,6 +365,41 @@ detection of every coalition of identities under one real actor. A
 coalition can produce internally consistent history at real cost. The
 claim is narrower: fabricated identities cannot fabricate authenticated
 history *for free*.
+
+### 12.1 Scalability — real, unaddressed limits
+
+Cross-domain, this scales well by construction — no consensus, no
+shared bottleneck. *Within* a single domain, real costs grow
+unboundedly:
+
+**Local storage.** A continuously-running domain accumulates one event
+per real progression epoch, plus one per real economic action — the
+same unbounded growth v2.0 described, unchanged in kind.
+
+**Wallet materialization — a real regression from v2.0, not carried
+forward.** v2.0 described an incremental catch-up mechanism
+(`coveredEventIds`, applying only genuinely new events on top of
+already-materialized state) for Mirror, wallet, and identity-cost
+alike. **Verified directly against the current source: this optimization
+does not exist in the current `aiwa-core`.**
+`materializeWallet(rewardParams, orderedEvents, onProgress,
+verifyFn, contractVerifiers)` takes no prior-state argument at all —
+every call folds the *entire* ordered event list from genesis, every
+time (`aiwa-lib`'s own `AIWA._materializeWallet()` calls it this way on
+every single `balance()`/`claimable()`/`send()`). For a long-lived
+domain this is a real, currently-unaddressed cost, reintroduced during
+the split rather than preserved — worth stating exactly this plainly,
+not smoothed over as "unchanged from v2.0."
+
+**Unbounded full-sync payload.** `aiwa-platform`'s own `Replicator`
+sends, per `EventLog.since(knownIds)` (§3), every event a peer is
+missing in one pass on connect — for a domain with a real, large
+history, this payload grows without bound, with no tested ceiling on
+what a real transport can carry. The identical, real, open limit v2.0
+described; unchanged.
+
+None of these are addressed yet — real, open engineering work, not a
+solved problem being merely under-documented.
 
 ## 13. Causal Tick
 
@@ -374,10 +457,52 @@ where $e_q$'s own real VDF proof is independently re-verified (§6),
 never trusted from the event's shape alone — two real vulnerabilities
 (grinding via cheaply-variable event ids; a fabricated, never-computed
 $\mathrm{vdfOutput}$) were found and closed here during v2.0's own
-development, unchanged since. `generous-transfer.js`,
-`matching-contract.js` (§15.1, a real, second, composing contract), and
-the generic `contract-payout` extension point in `wallet.js` (§15.2) are
-present and tested unchanged in the current `aiwa-core`.
+development, unchanged since. `generous-transfer.js` is present and
+tested unchanged in the current `aiwa-core`.
+
+### 15.1 Contract identity and composability
+
+Built as an external contract, never a modification to the core
+protocol above — transfer, progression, and VDF verification are only
+ever *consumed*, never altered. $\mathrm{CONTRACT\_ID} =
+\texttt{aiwa-generous-transfer-v1}$ is part of the donor's own signed
+commitment $c$, never mangled into an address (§2's own address is
+already a direct cryptographic proof; encoding a contract tag into it
+risks real confusion about which real destination a transfer actually
+targets). `matching-contract.js` — a real, second, independently
+tested contract composing directly with this one, verified by directly
+calling `resolveGenerousSend` — is present, unchanged, in the current
+`aiwa-core`.
+
+**The real collision risk, structurally closed, not merely
+documented.** A signature check alone only ever proves "signed by this
+key, over this exact content" — never "this is really the trusted
+module it claims to be." A forged commitment claiming
+$\mathrm{aiwa\text{-}generous\text{-}transfer\text{-}v1}$ passes its
+own signature check fine from a completely different keypair. §16's
+own `registerVerifiedContract` makes registration itself demand proof:
+a contract's own currently-deployed source is independently re-hashed
+against a pinned expected value before its `verifyPayout` is ever
+added to the registry.
+
+### 15.2 A generic payout mechanism
+
+For a contract's own conditional outcome to move real, spendable AIWA,
+some code must apply a real state transition to Conservation's own
+claim ledger. `wallet.js` exposes one generic extension point — a
+`contractVerifiers` map, $\{\mathrm{contractId} \mapsto
+\mathrm{verifyPayout}\}$, supplied by the application, never
+`wallet.js`'s own source — so a new contract needs no change to the
+core protocol at all, only a growing application-level registry.
+
+**Honest gap, stated plainly.** v2.0's own reference application (the
+original AIWA_chain UI) had a real "Give" tab wiring generous transfer
+directly into the wallet: sending a bonus alongside an ordinary
+transfer, showing pending offers and their resolved outcomes. **No
+equivalent exists yet in `aiwa-lib` or `AIWA_project`.** The mechanism
+above is real and tested at the protocol layer; nothing in the current
+deployment calls it. Building that interface is real, open,
+not-yet-done work — not a solved problem left undocumented.
 
 ## 16. Publishing a single contract's source, content-addressed
 
@@ -396,6 +521,29 @@ source** against a pinned hash before registering its `verifyPayout`
 into `contractVerifiers` (§15.2) — a narrower, different job from §19
 below, which publishes and serves a whole, independently-runnable
 application.
+
+**The same honest gap as §15.2.** v2.0's reference UI had a "Publish a
+contract" card and a `scanContractSpecs` listing. Neither has an
+`aiwa-lib`/`AIWA_project` equivalent yet — `contract-registry.js` is
+real and tested, unused by anything above it in the current stack.
+
+### 16.1 Cross-runtime interoperability — present in v2.0, not carried forward
+
+v2.0 claimed a confirmed, independent Rust reproduction
+(`interop/rust-vdf/`) of every primitive an external chain's own
+adapter would need — SHA-256 canonicalization, practical Wesolowski
+verification, Ed25519 signature verification against a different
+library — checked byte-identical against the real JS output. **Verified
+directly: no such directory, and no cross-runtime test, exists in the
+current `aiwa-core`.** This was not silently dropped by omission in
+v2.0's own reasoning — the underlying algorithms (§3, §6.1, Ed25519)
+are unchanged and remain, in principle, exactly as reproducible in
+another language as before — but the *specific, independent
+confirmation* v2.0 could point to no longer exists as a checked
+artifact. Restoring it is real, straightforward, not-yet-done work: a
+second-language reimplementation of §3's canonicalization, §6.1's
+Wesolowski verification, and Ed25519 signing/verification, checked
+byte-identical against `aiwa-core`'s own real output.
 
 ---
 
