@@ -8,7 +8,11 @@ directly against [`aiwa-lib`](https://github.com/theodoreyong9/Aiwa_lib),
 which composes [`aiwa-core`](https://github.com/theodoreyong9/Aiwa_core)
 (validation) and [`aiwa-platform`](https://github.com/theodoreyong9/Aiwa_platform)
 (distributed infra). This document describes what the page actually
-does today — not a changelog, not a roadmap.
+does today — not a changelog, not a roadmap. For the formal protocol
+specification — identity, the event log, progression, accrual,
+conservation, delegation, bearer vouchers, and everything else that
+lives in `aiwa-core` rather than in this page — see
+[`YELLOWPAPER.md`](./YELLOWPAPER.md).
 
 ## Running it
 
