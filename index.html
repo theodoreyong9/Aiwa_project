@@ -1,0 +1,385 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>AIWA</title>
+<script type="importmap">
+{ "imports": {
+  "aiwa-lib": "/node_modules/aiwa-lib/src/index.js",
+  "aiwa-core": "/node_modules/aiwa-core/src/index.js",
+  "aiwa-platform": "/node_modules/aiwa-platform/src/index.js",
+  "@noble/curves/": "/node_modules/@noble/curves/",
+  "@noble/hashes/": "/node_modules/@noble/hashes/",
+  "@scure/bip39": "/node_modules/@scure/bip39/index.js",
+  "@scure/bip39/": "/node_modules/@scure/bip39/"
+} }
+</script>
+<style>
+  :root { color-scheme: light dark; }
+  body { font: 15px/1.5 -apple-system, system-ui, sans-serif; max-width: 640px; margin: 0 auto; padding: 16px; }
+  h1 { font-size: 20px; margin-bottom: 4px; }
+  h2 { font-size: 15px; margin: 0 0 8px; opacity: 0.7; text-transform: uppercase; letter-spacing: 0.04em; }
+  section { border: 1px solid color-mix(in srgb, currentColor 15%, transparent); border-radius: 10px; padding: 14px; margin-bottom: 14px; }
+  section[hidden] { display: none; }
+  label { display: block; font-size: 13px; opacity: 0.8; margin: 8px 0 3px; }
+  input, textarea, select { width: 100%; box-sizing: border-box; padding: 7px 9px; font: inherit; border-radius: 6px; border: 1px solid color-mix(in srgb, currentColor 25%, transparent); background: transparent; color: inherit; }
+  textarea { font-family: ui-monospace, monospace; font-size: 12px; resize: vertical; }
+  button { padding: 8px 14px; font: inherit; border-radius: 6px; border: 1px solid color-mix(in srgb, currentColor 25%, transparent); background: color-mix(in srgb, currentColor 6%, transparent); color: inherit; cursor: pointer; margin: 4px 6px 4px 0; }
+  button:hover { background: color-mix(in srgb, currentColor 12%, transparent); }
+  button:disabled { opacity: 0.4; cursor: default; }
+  .row { display: flex; justify-content: space-between; align-items: baseline; padding: 4px 0; }
+  .row .value { font-family: ui-monospace, monospace; font-size: 13px; word-break: break-all; text-align: right; max-width: 60%; }
+  .muted { opacity: 0.6; font-size: 12px; }
+  .error { color: #d33; font-size: 13px; margin-top: 6px; }
+  .ok { color: #2a8; font-size: 13px; margin-top: 6px; }
+  #qr { margin: 10px 0; }
+  #qr canvas { border-radius: 8px; }
+  .log { max-height: 140px; overflow-y: auto; font-family: ui-monospace, monospace; font-size: 11px; background: color-mix(in srgb, currentColor 5%, transparent); border-radius: 6px; padding: 8px; }
+</style>
+</head>
+<body>
+
+<h1>AIWA</h1>
+<p class="muted">A real wallet — connect, balance, burn, claim, send/receive. No fixed hosting: this page and every real balance below are yours, offline-capable, peer to peer.</p>
+
+<!-- ============ CONNECT ============ -->
+<section id="connect-section">
+  <h2>Connect</h2>
+  <div id="connect-form">
+    <label for="mnemonic">Recover from a real BIP39 mnemonic (optional)</label>
+    <input id="mnemonic" type="text" placeholder="leave empty to generate a brand-new real identity" autocomplete="off">
+    <button id="btn-connect">Connect</button>
+  </div>
+  <div id="connected-info" hidden>
+    <div class="row"><span>Address</span><span class="value" id="out-address"></span></div>
+    <div class="row"><span>Identity id</span><span class="value" id="out-identity-id"></span></div>
+    <button id="btn-disconnect">Disconnect</button>
+    <button id="btn-join-network">Join network</button>
+    <span id="network-status" class="muted"></span>
+  </div>
+  <div id="connect-error" class="error"></div>
+</section>
+
+<!-- ============ BALANCES ============ -->
+<section id="balances-section" hidden>
+  <h2>Solana</h2>
+  <label for="rpc-endpoint">RPC endpoint</label>
+  <input id="rpc-endpoint" type="text" value="https://api.devnet.solana.com">
+  <div class="row"><span>SOL balance</span><span class="value" id="out-sol-balance">—</span></div>
+  <button id="btn-refresh-sol">Refresh</button>
+  <label for="burn-amount">Burn (SOL, real, irreversible — Solana's own incinerator address)</label>
+  <input id="burn-amount" type="number" step="0.001" min="0" placeholder="0.01">
+  <button id="btn-burn">Burn</button>
+  <div id="burn-result" class="muted"></div>
+
+  <h2 style="margin-top:16px">AIWA</h2>
+  <div class="row"><span>Spendable now</span><span class="value" id="out-spendable">—</span></div>
+  <div class="row"><span>Claimable (not yet spendable)</span><span class="value" id="out-claimable">—</span></div>
+  <div class="row"><span class="muted">Total (spendable + claimable)</span><span class="value muted" id="out-balance">—</span></div>
+  <button id="btn-claim">Claim</button>
+  <button id="btn-toggle-progress">Start progress loop</button>
+  <label for="commit-amount" style="margin-top:10px">Commit capital after a burn (b)</label>
+  <input id="commit-amount" type="number" step="0.1" min="0" placeholder="10">
+  <button id="btn-commit">Record commitment</button>
+</section>
+
+<!-- ============ SEND ============ -->
+<section id="send-section" hidden>
+  <h2>Send AIWA</h2>
+  <label for="send-to">Recipient identity id</label>
+  <input id="send-to" type="text" placeholder="the recipient's real identity id">
+  <label for="send-amount">Amount (up to what's spendable now — see above)</label>
+  <input id="send-amount" type="text" placeholder="1.5">
+  <button id="btn-send-max" type="button">Max</button>
+  <button id="btn-send-network">Send over the network</button>
+  <button id="btn-send-offline">Generate offline bundle (QR)</button>
+  <div id="qr"></div>
+  <div id="send-share" hidden>
+    <button id="btn-share">Share…</button>
+    <button id="btn-copy-blob">Copy to clipboard</button>
+  </div>
+  <div id="send-result" class="muted"></div>
+</section>
+
+<!-- ============ RECEIVE ============ -->
+<section id="receive-section" hidden>
+  <h2>Receive</h2>
+  <button id="btn-scan">Scan a QR code</button>
+  <video id="scan-video" hidden playsinline muted style="width:100%;border-radius:8px;"></video>
+  <label for="receive-blob">…or paste a received bundle</label>
+  <textarea id="receive-blob" rows="3"></textarea>
+  <button id="btn-receive">Receive</button>
+  <div id="receive-result" class="muted"></div>
+</section>
+
+<!-- ============ CHANNEL ============ -->
+<section id="channel-section" hidden>
+  <h2>Channel — sign once, click as many times as you want</h2>
+  <p class="muted">One real signature opens a channel with a peer. No pre-funding, nothing escrowed — every click afterward signs with an already-unlocked session key alone.</p>
+  <label for="channel-peer">Peer identity id</label>
+  <input id="channel-peer" type="text">
+  <button id="btn-open-channel">Open channel</button>
+  <div id="channel-open" hidden>
+    <div class="row"><span>Session address</span><span class="value" id="out-channel-address"></span></div>
+    <label for="channel-amount">Amount per click</label>
+    <input id="channel-amount" type="text" placeholder="0.1">
+    <button id="btn-channel-send">Send (click me repeatedly)</button>
+    <div class="log" id="channel-log"></div>
+  </div>
+</section>
+
+<script type="module">
+import { AIWA, encodeOfflineBundle, decodeOfflineBundle } from 'aiwa-lib';
+import { WebrtcTransport } from 'aiwa-platform';
+
+// A real deployment must choose its own real economic parameters —
+// these are the SAME placeholder values aiwa-core's own test suite
+// uses, not a real, chosen model. See this repo's own README.
+const REWARD_PARAMS = { alpha: 1.1, beta: 2.2, gamma: 3, C: Math.pow(33, 3), minQ: 1 };
+
+const $ = (id) => document.getElementById(id);
+let aiwa = null;
+let progressLoopOn = false;
+let channel = null;
+let displayRefreshTimer = null;
+
+function showError(el, message) { el.textContent = message ? String(message) : ''; }
+
+// A real error anywhere (a click handler with no try/catch of its own,
+// a background timer tick) must never fail silently — surfaced here
+// so it's always visible, not just when a handler happened to wrap
+// its own call in try/catch.
+window.addEventListener('unhandledrejection', (event) => {
+  console.error('unhandled:', event.reason);
+  showError($('connect-error'), `Unexpected error: ${event.reason?.message ?? event.reason}`);
+});
+
+async function refreshLocalState() {
+  $('out-address').textContent = aiwa.address;
+  $('out-identity-id').textContent = aiwa.identity.id;
+  $('out-spendable').textContent = await aiwa.spendableBalance();
+  $('out-claimable').textContent = await aiwa.claimable();
+  $('out-balance').textContent = await aiwa.balance();
+}
+
+$('btn-connect').addEventListener('click', async () => {
+  showError($('connect-error'), '');
+  try {
+    aiwa = new AIWA({ rewardParams: REWARD_PARAMS, dbName: 'aiwa-project-wallet' });
+    const mnemonic = $('mnemonic').value.trim();
+    await aiwa.connect(mnemonic ? { mnemonic } : {});
+    $('connect-form').hidden = true;
+    $('connected-info').hidden = false;
+    $('balances-section').hidden = false;
+    $('send-section').hidden = false;
+    $('receive-section').hidden = false;
+    $('channel-section').hidden = false;
+    await refreshLocalState();
+  } catch (err) {
+    showError($('connect-error'), err.message);
+  }
+});
+
+$('btn-disconnect').addEventListener('click', async () => {
+  await aiwa.disconnect(); // also stops the real progress loop
+  aiwa = null;
+  channel = null;
+  progressLoopOn = false;
+  clearInterval(displayRefreshTimer);
+  displayRefreshTimer = null;
+  $('btn-toggle-progress').textContent = 'Start progress loop';
+  $('connect-form').hidden = false;
+  $('connected-info').hidden = true;
+  $('balances-section').hidden = true;
+  $('send-section').hidden = true;
+  $('receive-section').hidden = true;
+  $('channel-section').hidden = true;
+  $('channel-open').hidden = true;
+  $('network-status').textContent = '';
+});
+
+$('btn-join-network').addEventListener('click', async () => {
+  const transport = new WebrtcTransport();
+  await aiwa.joinNetwork(transport);
+  window.__aiwaTransport = transport; // exposed for real signaling exchange via devtools/another peer — see README
+  $('network-status').textContent = `joined — real selfId: ${transport.selfId}`;
+});
+
+$('btn-refresh-sol').addEventListener('click', async () => {
+  try {
+    const solanaWeb3 = await import('https://esm.sh/@solana/web3.js@1.98.0');
+    const connection = new solanaWeb3.Connection($('rpc-endpoint').value, 'confirmed');
+    const lamports = await aiwa.solBalance(connection);
+    $('out-sol-balance').textContent = `${lamports / 1e9} SOL`;
+  } catch (err) {
+    $('out-sol-balance').textContent = `error: ${err.message}`;
+  }
+});
+
+$('btn-burn').addEventListener('click', async () => {
+  const sol = Number($('burn-amount').value);
+  if (!(sol > 0)) return;
+  try {
+    const solanaWeb3 = await import('https://esm.sh/@solana/web3.js@1.98.0');
+    const connection = new solanaWeb3.Connection($('rpc-endpoint').value, 'confirmed');
+    const signature = await aiwa.burn(Math.round(sol * 1e9), connection);
+    $('burn-result').textContent = `real burn broadcast: ${signature}`;
+  } catch (err) {
+    $('burn-result').textContent = `error: ${err.message}`;
+  }
+});
+
+$('btn-commit').addEventListener('click', async () => {
+  const b = Number($('commit-amount').value);
+  if (!(b >= 0)) return;
+  await aiwa.recordCommitment({ b });
+  await refreshLocalState();
+});
+
+$('btn-claim').addEventListener('click', async () => {
+  const claimable = await aiwa.claimable();
+  if (Number(claimable) <= 0) return;
+  await aiwa.claim(claimable);
+  await refreshLocalState();
+});
+
+$('btn-toggle-progress').addEventListener('click', (e) => {
+  progressLoopOn = !progressLoopOn;
+  if (progressLoopOn) {
+    aiwa.startProgressLoop({ onError: (err) => console.error('progress loop:', err) });
+    e.target.textContent = 'Stop progress loop';
+    displayRefreshTimer = setInterval(() => { if (aiwa) refreshLocalState(); }, 5000);
+  } else {
+    aiwa.stopProgressLoop();
+    e.target.textContent = 'Start progress loop';
+    clearInterval(displayRefreshTimer);
+    displayRefreshTimer = null;
+  }
+});
+
+$('btn-send-max').addEventListener('click', async () => {
+  $('send-amount').value = await aiwa.spendableBalance();
+});
+
+$('btn-send-network').addEventListener('click', async () => {
+  try {
+    await aiwa.send($('send-to').value.trim(), $('send-amount').value.trim());
+    await refreshLocalState();
+    $('send-result').textContent = 'sent over the network';
+  } catch (err) {
+    $('send-result').textContent = `error: ${err.message}`;
+  }
+});
+
+let lastOfflineBlob = null;
+$('btn-send-offline').addEventListener('click', async () => {
+  try {
+    // The real transfer is already final the moment this resolves —
+    // rendering its QR code is a separate, best-effort display step
+    // that must never make a genuinely successful send look failed.
+    const bundle = await aiwa.sendOfflineBundle($('send-to').value.trim(), $('send-amount').value.trim());
+    lastOfflineBlob = encodeOfflineBundle(bundle);
+    $('send-share').hidden = false;
+    await refreshLocalState(); // completes before the success message, so the display never lags what it reports
+    $('send-result').textContent = 'offline bundle ready — no network was used to create it';
+    try {
+      await renderQr(lastOfflineBlob);
+    } catch (qrErr) {
+      $('send-result').textContent += ` (QR image unavailable: ${qrErr.message} — use Share/Copy instead)`;
+    }
+  } catch (err) {
+    $('send-result').textContent = `error: ${err.message}`;
+  }
+});
+
+$('btn-share').addEventListener('click', async () => {
+  if (navigator.share) await navigator.share({ text: lastOfflineBlob, title: 'AIWA payment' });
+  else $('send-result').textContent = 'Web Share not supported here — use Copy instead.';
+});
+$('btn-copy-blob').addEventListener('click', async () => {
+  await navigator.clipboard.writeText(lastOfflineBlob);
+  $('send-result').textContent = 'copied to clipboard';
+});
+
+async function renderQr(text) {
+  const QRCode = await import('https://esm.sh/qrcode@1.5.3');
+  const canvas = document.createElement('canvas');
+  await QRCode.toCanvas(canvas, text, { width: 240 });
+  $('qr').replaceChildren(canvas);
+}
+
+$('btn-receive').addEventListener('click', async () => {
+  try {
+    const bundle = decodeOfflineBundle($('receive-blob').value.trim());
+    await aiwa.receiveOfflineBundle(bundle);
+    $('receive-blob').value = '';
+    await refreshLocalState();
+    $('receive-result').textContent = 'received and verified — real signature and causal checks passed';
+  } catch (err) {
+    $('receive-result').textContent = `rejected: ${err.message}`;
+  }
+});
+
+$('btn-scan').addEventListener('click', async () => {
+  if (!('BarcodeDetector' in window)) {
+    $('receive-result').textContent = 'Camera QR scanning is not supported in this browser — paste the bundle text instead.';
+    return;
+  }
+  const video = $('scan-video');
+  const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
+  video.srcObject = stream;
+  video.hidden = false;
+  await video.play();
+  const detector = new BarcodeDetector({ formats: ['qr_code'] });
+  const interval = setInterval(async () => {
+    const codes = await detector.detect(video).catch(() => []);
+    if (codes.length > 0) {
+      clearInterval(interval);
+      stream.getTracks().forEach((t) => t.stop());
+      video.hidden = true;
+      $('receive-blob').value = codes[0].rawValue;
+    }
+  }, 300);
+});
+
+$('btn-open-channel').addEventListener('click', async () => {
+  const peer = $('channel-peer').value.trim();
+  if (!peer) return;
+  try {
+    channel = await aiwa.openChannel(peer, { requireNetwork: !!aiwa.replicator });
+    $('out-channel-address').textContent = channel.address;
+    $('channel-open').hidden = false;
+    $('channel-log').textContent = `channel opened for ${peer} — session address ${channel.address}\n`;
+  } catch (err) {
+    $('channel-log').textContent = `error: ${err.message}`;
+  }
+});
+
+$('btn-channel-send').addEventListener('click', async () => {
+  const amount = $('channel-amount').value.trim();
+  if (!amount) return;
+  try {
+    if (aiwa.replicator) {
+      await channel.send(amount);
+    } else {
+      const bundle = await channel.sendOfflineBundle(amount);
+      lastOfflineBlob = encodeOfflineBundle(bundle);
+    }
+    await refreshLocalState();
+    $('channel-log').textContent += `click: sent ${amount} — no root-key signature needed\n`;
+    $('channel-log').scrollTop = $('channel-log').scrollHeight;
+    if (!aiwa.replicator) {
+      try {
+        await renderQr(lastOfflineBlob);
+      } catch (qrErr) {
+        $('channel-log').textContent += `(QR image unavailable: ${qrErr.message} — use Share/Copy instead)\n`;
+      }
+    }
+  } catch (err) {
+    $('channel-log').textContent += `error: ${err.message}\n`;
+  }
+});
+</script>
+</body>
+</html>

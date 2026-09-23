@@ -1,0 +1,11 @@
+{
+  "name": "aiwa-project",
+  "version": "0.1.0",
+  "description": "A real wallet interface for AIWA: connect, balance, burn, claim, send/receive — including fully offline via QR/share, and a real delegated \"sign once, click many times\" channel — built on aiwa-lib.",
+  "private": true,
+  "type": "module",
+  "license": "MIT",
+  "dependencies": {
+    "aiwa-lib": "github:theodoreyong9/Aiwa_lib"
+  }
+}
