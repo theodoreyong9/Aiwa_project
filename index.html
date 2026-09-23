@@ -107,6 +107,29 @@
   <div id="receive-result" class="muted"></div>
 </section>
 
+<!-- ============ WITHDRAW (bearer voucher) ============ -->
+<section id="voucher-section" hidden>
+  <h2>Withdraw — a real bearer QR</h2>
+  <p class="muted">Generates a real withdrawal code redeemable by whoever scans it first — no pre-funding, nothing escrowed. The code can be freely copied; only the first real redemption succeeds.</p>
+  <label for="voucher-amount">Amount</label>
+  <input id="voucher-amount" type="text" placeholder="5.0">
+  <button id="btn-issue-voucher">Create withdrawal QR</button>
+  <div id="voucher-issue-result" class="muted"></div>
+  <div id="voucher-qr"></div>
+  <div id="voucher-share" hidden>
+    <button id="btn-voucher-share">Share…</button>
+    <button id="btn-voucher-copy">Copy to clipboard</button>
+  </div>
+
+  <h3 style="margin-top:16px">Redeem a withdrawal code</h3>
+  <button id="btn-scan-voucher">Scan a QR code</button>
+  <video id="voucher-scan-video" hidden playsinline muted style="width:100%;border-radius:8px;"></video>
+  <label for="voucher-redeem-blob">…or paste a withdrawal code</label>
+  <textarea id="voucher-redeem-blob" rows="3"></textarea>
+  <button id="btn-redeem-voucher">Redeem</button>
+  <div id="voucher-redeem-result" class="muted"></div>
+</section>
+
 <!-- ============ CHANNEL ============ -->
 <section id="channel-section" hidden>
   <h2>Channel — sign once, click as many times as you want</h2>
@@ -299,6 +322,7 @@ $('btn-connect').addEventListener('click', async () => {
     $('balances-section').hidden = false;
     $('send-section').hidden = false;
     $('receive-section').hidden = false;
+    $('voucher-section').hidden = false;
     $('channel-section').hidden = false;
     $('channel-disconnect-note').hidden = true;
     $('publish-section').hidden = false;
@@ -323,6 +347,7 @@ $('btn-disconnect').addEventListener('click', async () => {
   $('balances-section').hidden = true;
   $('send-section').hidden = true;
   $('receive-section').hidden = true;
+  $('voucher-section').hidden = true;
   $('publish-section').hidden = true;
   $('browse-section').hidden = true;
   $('network-status').textContent = '';
@@ -422,11 +447,31 @@ $('btn-copy-blob').addEventListener('click', async () => {
   $('send-result').textContent = 'copied to clipboard';
 });
 
-async function renderQr(text) {
+async function renderQr(text, containerId = 'qr') {
   const QRCode = await import('https://esm.sh/qrcode@1.5.3');
   const canvas = document.createElement('canvas');
   await QRCode.toCanvas(canvas, text, { width: 240 });
-  $('qr').replaceChildren(canvas);
+  $(containerId).replaceChildren(canvas);
+}
+
+/** Scans a QR code via the camera into `targetInput`'s value. Returns false (no camera opened) when BarcodeDetector isn't supported here — the caller decides how to tell the user. */
+async function scanQrInto(videoEl, targetInput) {
+  if (!('BarcodeDetector' in window)) return false;
+  const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
+  videoEl.srcObject = stream;
+  videoEl.hidden = false;
+  await videoEl.play();
+  const detector = new BarcodeDetector({ formats: ['qr_code'] });
+  const interval = setInterval(async () => {
+    const codes = await detector.detect(videoEl).catch(() => []);
+    if (codes.length > 0) {
+      clearInterval(interval);
+      stream.getTracks().forEach((t) => t.stop());
+      videoEl.hidden = true;
+      targetInput.value = codes[0].rawValue;
+    }
+  }, 300);
+  return true;
 }
 
 $('btn-receive').addEventListener('click', async () => {
@@ -442,25 +487,8 @@ $('btn-receive').addEventListener('click', async () => {
 });
 
 $('btn-scan').addEventListener('click', async () => {
-  if (!('BarcodeDetector' in window)) {
-    $('receive-result').textContent = 'Camera QR scanning is not supported in this browser — paste the bundle text instead.';
-    return;
-  }
-  const video = $('scan-video');
-  const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
-  video.srcObject = stream;
-  video.hidden = false;
-  await video.play();
-  const detector = new BarcodeDetector({ formats: ['qr_code'] });
-  const interval = setInterval(async () => {
-    const codes = await detector.detect(video).catch(() => []);
-    if (codes.length > 0) {
-      clearInterval(interval);
-      stream.getTracks().forEach((t) => t.stop());
-      video.hidden = true;
-      $('receive-blob').value = codes[0].rawValue;
-    }
-  }, 300);
+  const ok = await scanQrInto($('scan-video'), $('receive-blob'));
+  if (!ok) $('receive-result').textContent = 'Camera QR scanning is not supported in this browser — paste the bundle text instead.';
 });
 
 $('btn-open-channel').addEventListener('click', async () => {
@@ -593,6 +621,55 @@ $('btn-browse-creator').addEventListener('click', async () => {
   } catch (err) {
     $('browse-list').textContent = `error: ${err.message}`;
   }
+});
+
+let lastVoucherBlob = null;
+$('btn-issue-voucher').addEventListener('click', async () => {
+  const amount = $('voucher-amount').value.trim();
+  if (!amount) return;
+  try {
+    // The voucher is already real and final the moment this resolves —
+    // rendering its QR is a separate, best-effort display step, same
+    // pattern as the ordinary offline send.
+    const voucher = await aiwa.issueVoucher(amount);
+    lastVoucherBlob = encodeOfflineBundle(voucher);
+    $('voucher-share').hidden = false;
+    await refreshLocalState();
+    $('voucher-issue-result').textContent = 'withdrawal QR ready — whoever scans it first gets it';
+    try {
+      await renderQr(lastVoucherBlob, 'voucher-qr');
+    } catch (qrErr) {
+      $('voucher-issue-result').textContent += ` (QR image unavailable: ${qrErr.message} — use Share/Copy instead)`;
+    }
+  } catch (err) {
+    $('voucher-issue-result').textContent = `error: ${err.message}`;
+  }
+});
+
+$('btn-voucher-share').addEventListener('click', async () => {
+  if (navigator.share) await navigator.share({ text: lastVoucherBlob, title: 'AIWA withdrawal' });
+  else $('voucher-issue-result').textContent = 'Web Share not supported here — use Copy instead.';
+});
+$('btn-voucher-copy').addEventListener('click', async () => {
+  await navigator.clipboard.writeText(lastVoucherBlob);
+  $('voucher-issue-result').textContent = 'copied to clipboard';
+});
+
+$('btn-redeem-voucher').addEventListener('click', async () => {
+  try {
+    const voucher = decodeOfflineBundle($('voucher-redeem-blob').value.trim());
+    await aiwa.redeemVoucher(voucher);
+    $('voucher-redeem-blob').value = '';
+    await refreshLocalState();
+    $('voucher-redeem-result').textContent = 'redeemed — real signature and causal checks passed';
+  } catch (err) {
+    $('voucher-redeem-result').textContent = `rejected: ${err.message}`;
+  }
+});
+
+$('btn-scan-voucher').addEventListener('click', async () => {
+  const ok = await scanQrInto($('voucher-scan-video'), $('voucher-redeem-blob'));
+  if (!ok) $('voucher-redeem-result').textContent = 'Camera QR scanning is not supported in this browser — paste the code instead.';
 });
 </script>
 </body>

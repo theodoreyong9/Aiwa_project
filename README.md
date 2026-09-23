@@ -53,6 +53,16 @@ then open `http://127.0.0.1:8080/index.html`.
   it — real signature and causal verification, identical to any other
   real append; a forged or tampered bundle is rejected, not silently
   accepted.
+- **Withdraw — a real bearer QR**: a genuinely different primitive from
+  Send/Receive — the recipient is unknown until redemption time.
+  Generates a real hash-locked withdrawal code (`aiwa-lib`'s own
+  `issueVoucher`/`redeemVoucher`); whoever scans or pastes it first
+  genuinely gets the value. The code can be freely copied, screenshot,
+  forwarded — only the first real redemption succeeds, an honest
+  property of `aiwa-core`'s own single-writer conservation model, not
+  new double-spend logic. Same "detection via reconciliation" honest
+  limit as any offline send: two people can each locally believe they
+  redeemed it until their logs sync.
 - **Channel — sign once, click as many times as you want**: opens a
   real, per-peer delegated-send session (`aiwa-core`'s own real
   delegation mechanism) with ONE real signature from your root key, no
