@@ -116,8 +116,10 @@
   <label for="channel-peer">Peer identity id</label>
   <input id="channel-peer" type="text">
   <button id="btn-open-channel">Open channel</button>
+  <p class="muted" id="channel-disconnect-note" hidden>Still works — an open channel needs no root connection at all, not even to split an amount.</p>
   <div id="channel-open" hidden>
     <div class="row"><span>Session address</span><span class="value" id="out-channel-address"></span></div>
+    <div class="row"><span>Owner balance (via this channel)</span><span class="value" id="out-channel-balance">—</span></div>
     <label for="channel-amount">Amount per click</label>
     <input id="channel-amount" type="text" placeholder="0.1">
     <button id="btn-channel-send">Send (click me repeatedly)</button>
@@ -151,11 +153,17 @@ window.addEventListener('unhandledrejection', (event) => {
 });
 
 async function refreshLocalState() {
+  if (!aiwa || !aiwa.identity) return; // nothing to refresh once disconnected — the top wallet display is hidden anyway
   $('out-address').textContent = aiwa.address;
   $('out-identity-id').textContent = aiwa.identity.id;
   $('out-spendable').textContent = await aiwa.spendableBalance();
   $('out-claimable').textContent = await aiwa.claimable();
   $('out-balance').textContent = await aiwa.balance();
+}
+
+async function refreshChannelBalance() {
+  if (!channel) return;
+  $('out-channel-balance').textContent = await channel.balance();
 }
 
 $('btn-connect').addEventListener('click', async () => {
@@ -170,6 +178,7 @@ $('btn-connect').addEventListener('click', async () => {
     $('send-section').hidden = false;
     $('receive-section').hidden = false;
     $('channel-section').hidden = false;
+    $('channel-disconnect-note').hidden = true;
     await refreshLocalState();
     // Matches AIWA_chain's own original identity.js: progression runs
     // automatically for as long as you're connected, no manual button.
@@ -183,7 +192,6 @@ $('btn-connect').addEventListener('click', async () => {
 $('btn-disconnect').addEventListener('click', async () => {
   await aiwa.disconnect(); // also stops the real progress loop
   aiwa = null;
-  channel = null;
   clearInterval(displayRefreshTimer);
   displayRefreshTimer = null;
   $('connect-form').hidden = false;
@@ -191,9 +199,17 @@ $('btn-disconnect').addEventListener('click', async () => {
   $('balances-section').hidden = true;
   $('send-section').hidden = true;
   $('receive-section').hidden = true;
-  $('channel-section').hidden = true;
-  $('channel-open').hidden = true;
   $('network-status').textContent = '';
+  // An already-open channel is deliberately NOT cleared here and its
+  // section stays visible: it needs no root connection at all, for
+  // anything, including splitting an amount — see aiwa-lib's own
+  // Channel docs. Opening a NEW channel still needs one (btn-open-channel
+  // below), since issuing the one-time delegation needs the root key.
+  if (channel) {
+    $('channel-section').hidden = false;
+    $('channel-disconnect-note').hidden = false;
+    refreshChannelBalance();
+  }
 });
 
 async function ensureJoinedNetwork() {
@@ -322,6 +338,10 @@ $('btn-scan').addEventListener('click', async () => {
 $('btn-open-channel').addEventListener('click', async () => {
   const peer = $('channel-peer').value.trim();
   if (!peer) return;
+  if (!aiwa || !aiwa.identity) {
+    $('channel-log').textContent = 'error: connect first — opening a NEW channel needs the root key once, to issue its one-time delegation. An already-open channel keeps working without it.';
+    return;
+  }
   try {
     // Opening a channel needs a real path to the peer at least once, to
     // find them — join automatically rather than making that a separate
@@ -331,6 +351,7 @@ $('btn-open-channel').addEventListener('click', async () => {
     $('out-channel-address').textContent = channel.address;
     $('channel-open').hidden = false;
     $('channel-log').textContent = `channel opened for ${peer} — session address ${channel.address}\n`;
+    await refreshChannelBalance();
   } catch (err) {
     $('channel-log').textContent = `error: ${err.message}`;
   }
@@ -339,17 +360,19 @@ $('btn-open-channel').addEventListener('click', async () => {
 $('btn-channel-send').addEventListener('click', async () => {
   const amount = $('channel-amount').value.trim();
   if (!amount) return;
+  const live = !!(aiwa && aiwa.replicator);
   try {
-    if (aiwa.replicator) {
+    if (live) {
       await channel.send(amount);
     } else {
       const bundle = await channel.sendOfflineBundle(amount);
       lastOfflineBlob = encodeOfflineBundle(bundle);
     }
-    await refreshLocalState();
+    await refreshLocalState(); // no-op once disconnected — the channel's own balance is refreshed separately below
+    await refreshChannelBalance();
     $('channel-log').textContent += `click: sent ${amount} — no root-key signature needed\n`;
     $('channel-log').scrollTop = $('channel-log').scrollHeight;
-    if (!aiwa.replicator) {
+    if (!live) {
       try {
         await renderQr(lastOfflineBlob);
       } catch (qrErr) {

@@ -59,7 +59,10 @@ then open `http://127.0.0.1:8080/index.html`.
   pre-funding, nothing escrowed. Every subsequent click signs with an
   already-unlocked, real, deterministic session key alone — recoverable
   even after a crash, since it's derived from your own root key plus
-  the peer's id, never randomly generated.
+  the peer's id, never randomly generated. Genuinely self-sufficient
+  once open: clicking **Disconnect** does not stop it — a click that
+  needs splitting a claim into the exact amount still works, real
+  delegated split and all, with no root key involved for any amount.
 
 ## What isn't verified here, and why
 
