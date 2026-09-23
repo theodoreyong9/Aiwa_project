@@ -6,6 +6,6 @@
   "type": "module",
   "license": "MIT",
   "dependencies": {
-    "aiwa-lib": "github:theodoreyong9/Aiwa_lib"
+    "aiwa-lib": "git+https://github.com/theodoreyong9/Aiwa_lib.git"
   }
 }
