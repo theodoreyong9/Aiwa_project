@@ -57,12 +57,12 @@ layer:
 
 - **`aiwa-core`** — the protocol itself. Identity, the event log and its
   content-addressing, progression, the sequential proof, accrual,
-  conservation, Mirror, Causal Tick, relative rate, generous transfer,
+  conservation, Mirror, Causal Tick, relative rate,
   content-addressed contract publishing, delegation, and bearer
   vouchers. Depends on nothing of its own — only `@noble/curves`,
   `@noble/hashes`, `@scure/bip39`, and an optional `@solana/web3.js`
-  peer dependency for the genesis commitment (§8). 340 passing tests
-  (339 pure-JS, plus a real Rust build+run cross-check — §16.1).
+  peer dependency for the genesis commitment (§8). 310 passing tests
+  (309 pure-JS, plus a real Rust build+run cross-check — §16.1).
 - **`aiwa-platform`** — distributed infrastructure with no protocol
   logic of its own: WebRTC transport, a replicator that syncs an
   `aiwa-core` event log between peers, capability-gated data stores, a
@@ -71,7 +71,7 @@ layer:
 - **`aiwa-lib`** — the public, developer-facing facade. A real wallet
   API (`AIWA`) composing `aiwa-core`'s validation with `aiwa-platform`'s
   transport, and a smart-contract/token authoring SDK
-  (`defineContract`/`Contract`/`signedAction`). 31 passing tests.
+  (`defineContract`/`Contract`/`signedAction`). 36 passing tests.
 - **`AIWA_project`** — one concrete deployment: a single static page, no
   build step, no fixed server, wiring `aiwa-lib`'s API directly to DOM
   elements.
@@ -508,49 +508,43 @@ otherwise — a mitigation, never a closure.
 
 ---
 
-## 15. Generous transfer — deterministic, never chance
+## 15. Generous transfer — removed
 
-A donor may optionally, voluntarily attach a real, additional,
-conditional bonus to an ordinary transfer — payable only if a specific,
-real, future progression event of the *recipient's own* chain meets a
-public threshold. No randomness anywhere: the outcome is a pure
-function of public data, unpredictable only because one real input (a
-real, sequential VDF output) genuinely does not exist yet — structurally
-identical to mining's own real property.
+Earlier revisions of this document described a "generous transfer"
+contract: a donor optionally, voluntarily attaching a real, additional,
+conditional bonus to an ordinary transfer, payable only if a specific,
+real, future progression event of the *recipient's own* chain met a
+public threshold — a deterministic mechanism, never chance, unpredictable
+only because one real input (a real, sequential VDF output) genuinely
+did not exist yet.
 
-$$h = \mathrm{SHA\text{-}256}(\mathrm{id}(c) \,\|\, \mathrm{vdfOutput}(e_q)) \qquad \text{win} \iff h \text{ has} \geq \mathrm{thresholdBits} \text{ leading zero bits}$$
+**No longer true.** `generous-transfer.js` and the composing
+`matching-contract.js` (§15.1, below) were real, correctly-ported
+AIWA_chain functionality — not invented without basis — but neither
+was ever exposed by `aiwa-lib`'s public API nor by any interface built
+on it (§15.2's own "honest gap" already said as much: "no equivalent
+exists yet in `aiwa-lib` or `AIWA_project`"). Real code, real tests,
+zero consumer anywhere in the actual product. Found and removed
+together with `contract-scan.js` (a generic event-scanning helper
+factored out for these two contracts and one other, adopted by none of
+them). Neither `wallet.js`'s own generic `contract-payout`/
+`contractVerifiers` extension point (§15.2) nor `contract-registry.js`
+(§16) — both genuinely reusable, contract-agnostic infrastructure —
+were touched by this removal.
 
-where $e_q$'s own real VDF proof is independently re-verified (§6),
-never trusted from the event's shape alone — two real vulnerabilities
-(grinding via cheaply-variable event ids; a fabricated, never-computed
-$\mathrm{vdfOutput}$) were found and closed here during v2.0's own
-development, unchanged since. `generous-transfer.js` is present and
-tested unchanged in the current `aiwa-core`.
+### 15.1 Contract identity and composability — historical
 
-### 15.1 Contract identity and composability
-
-Built as an external contract, never a modification to the core
-protocol above — transfer, progression, and VDF verification are only
-ever *consumed*, never altered. $\mathrm{CONTRACT\_ID} =
-\texttt{aiwa-generous-transfer-v1}$ is part of the donor's own signed
-commitment $c$, never mangled into an address (§2's own address is
-already a direct cryptographic proof; encoding a contract tag into it
-risks real confusion about which real destination a transfer actually
-targets). `matching-contract.js` — a real, second, independently
-tested contract composing directly with this one, verified by directly
-calling `resolveGenerousSend` — is present, unchanged, in the current
-`aiwa-core`.
-
-**The real collision risk, structurally closed, not merely
-documented.** A signature check alone only ever proves "signed by this
-key, over this exact content" — never "this is really the trusted
-module it claims to be." A forged commitment claiming
-$\mathrm{aiwa\text{-}generous\text{-}transfer\text{-}v1}$ passes its
-own signature check fine from a completely different keypair. §16's
-own `registerVerifiedContract` makes registration itself demand proof:
-a contract's own currently-deployed source is independently re-hashed
-against a pinned expected value before its `verifyPayout` is ever
-added to the registry.
+This subsection documented how the now-removed contracts stayed
+external to the core protocol: `CONTRACT_ID` embedded in a donor's own
+signed commitment rather than mangled into an address (§2's own
+address is already a direct cryptographic proof), and how
+`registerVerifiedContract` (§16) closed a real collision risk — a
+signature alone only ever proves "signed by this key, over this exact
+content," never "this is really the trusted module it claims to be,"
+so registration re-hashes a contract's own currently-deployed source
+against a pinned expected value before trusting its `verifyPayout`.
+That collision-risk mechanism (`registerVerifiedContract` itself) is
+unchanged and still real — only its two example consumers are gone.
 
 ### 15.2 A generic payout mechanism
 
@@ -565,11 +559,12 @@ core protocol at all, only a growing application-level registry.
 **Honest gap, stated plainly.** v2.0's own reference application (the
 original AIWA_chain UI) had a real "Give" tab wiring generous transfer
 directly into the wallet: sending a bonus alongside an ordinary
-transfer, showing pending offers and their resolved outcomes. **No
-equivalent exists yet in `aiwa-lib` or `AIWA_project`.** The mechanism
-above is real and tested at the protocol layer; nothing in the current
-deployment calls it. Building that interface is real, open,
-not-yet-done work — not a solved problem left undocumented.
+transfer, showing pending offers and their resolved outcomes. Neither
+that UI nor the underlying `generous-transfer.js`/`matching-contract.js`
+it wired into ever gained an `aiwa-lib`/`AIWA_project` equivalent
+(§15) — the generic `contractVerifiers` extension point above is real
+and tested; no concrete contract currently registers into it in the
+current stack.
 
 ## 16. Publishing a single contract's source, content-addressed
 
@@ -607,9 +602,12 @@ own (the project this codebase was itself ported from) after directly
 verifying that `vdf.js`, `weighted-median.js`, `conservation.js`'s
 split invariant, `mirror.js`'s monotonicity check, `relative-rate.js`'s
 central ratio, `causal-tick.js`'s consistency check,
-`wesolowski-vdf.js`, `bigint-math.js`, `generous-transfer.js`, and
+`wesolowski-vdf.js`, `bigint-math.js`, and
 §7's own reward formula (`reward.js`/`fixed-point-math.js`) are
-algorithmically identical between the two codebases.
+algorithmically identical between the two codebases. (An earlier
+revision of this cross-check also covered `generous-transfer.js`'s own
+deterministic outcome hash — removed, on both the JS and Rust sides,
+together with that file itself; see §15.)
 
 `event.js`'s own canonical id format (§3) genuinely differs from
 AIWA_chain's — this project's real, wider
@@ -796,7 +794,7 @@ event log is the safe default for a contract's own internal state.
 | Causal Tick (§13) | `aiwa-core` | `src/causal-tick.js`, `src/weighted-median.js` |
 | Hardware roots (§13.1) | `aiwa-core` | `src/hardware-attestation.js` |
 | Relative rate (§14) | `aiwa-core` | `src/relative-rate.js` |
-| Generous transfer (§15) | `aiwa-core` | `src/generous-transfer.js`, `src/matching-contract.js` |
+| Generous transfer (§15) | — | removed; see §15 |
 | Single-file contract publishing (§16) | `aiwa-core` | `src/contract-registry.js` |
 | Delegation, Channel (§17) | `aiwa-core` + `aiwa-lib` | `aiwa-core/src/wallet.js`, `aiwa-lib/src/wallet.js` (`Channel`) |
 | Bearer vouchers (§18) | `aiwa-core` + `aiwa-lib` | `aiwa-core/src/wallet.js`, `aiwa-lib/src/wallet.js` (`issueVoucher`/`redeemVoucher`) |
@@ -811,8 +809,8 @@ event log is the safe default for a contract's own internal state.
 
 ## Status
 
-340 passing tests (`aiwa-core`, including a real Rust build+run
+310 passing tests (`aiwa-core`, including a real Rust build+run
 cross-check when a Rust toolchain is available), 72 (`aiwa-platform`),
-31 (`aiwa-lib`). Every package is independently, publicly testable;
+36 (`aiwa-lib`). Every package is independently, publicly testable;
 none depends on a shared, centrally-hosted server to run its own
 suite.
