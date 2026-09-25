@@ -12,9 +12,11 @@ Two sections are new: Delegation (§17) and Bearer vouchers (§18), neither
 of which existed in v2.0. A first pass at this revision condensed §11.1,
 §12.1, §15.1, §15.2, and §16.1 out entirely without flagging the omission
 — caught on review and restored here, updated rather than pasted back
-unchanged: §12.1 documents a real, still-unaddressed regression
-(incremental wallet materialization, present in v2.0, absent from the
-current `aiwa-core`), and §16.1 documented a real capability v2.0 could
+unchanged: §12.1 originally documented a real regression (incremental
+wallet materialization, present in v2.0, absent from the current
+`aiwa-core` at the time) — **since fixed, along with the other two real
+scalability limits it documented; see §12.1 for what changed and what
+honest tradeoffs remain**. §16.1 documented a real capability v2.0 could
 point to (cross-runtime Rust verification) that no longer existed as a
 checked artifact in the current codebase — **since restored**, and now
 covering a wider, more current surface than v2.0's own version did (a
@@ -433,40 +435,73 @@ coalition can produce internally consistent history at real cost. The
 claim is narrower: fabricated identities cannot fabricate authenticated
 history *for free*.
 
-### 12.1 Scalability — real, unaddressed limits
+### 12.1 Scalability — three real limits, now addressed, with the honest tradeoffs each one makes
 
 Cross-domain, this scales well by construction — no consensus, no
-shared bottleneck. *Within* a single domain, real costs grow
-unboundedly:
+shared bottleneck. *Within* a single domain, three real costs used to
+grow unboundedly. All three are now addressed; none was "solved away"
+for free — each trades something explicit and documented, never hidden.
 
-**Local storage.** A continuously-running domain accumulates one event
-per real progression epoch, plus one per real economic action — the
-same unbounded growth v2.0 described, unchanged in kind.
+**Local storage — bounded via checkpoints.** A continuously-running
+domain still accumulates one event per real progression epoch plus one
+per real economic action, forever, *unless* pruned. `aiwa-core`'s
+`checkpoint.js` adds a real, self-signed event embedding a domain's own
+already-materialized state as of a specific set of log heads
+(signer-scoped from the start: `verifyCheckpoint` requires
+`event.author === event.payload.domain`, the identical discipline
+§7's own `'claim'`/`'accrual'` signer-scoping fix established).
+`EventLog.pruneBeforeCheckpoint()` then physically deletes every real
+event the checkpoint's own state already accounts for. **Honest
+tradeoff, stated plainly**: a peer who already independently verified
+everything up to a checkpoint loses nothing by trusting it afterward —
+it is genuinely their own, already-verified work, summarized. A
+brand-new peer who receives *only* a pruned log can no longer
+independently re-derive that state from genesis; they trade full
+independent verifiability for a real, signed assertion by the domain's
+own key about its own past — the identical tradeoff Ethereum's own
+weak-subjectivity checkpoints make, not a flaw specific to this
+implementation. Checkpointing is opt-in, not automatic: a domain that
+never calls it keeps the original unbounded growth exactly as before.
 
-**Wallet materialization — a real regression from v2.0, not carried
-forward.** v2.0 described an incremental catch-up mechanism
-(`coveredEventIds`, applying only genuinely new events on top of
-already-materialized state) for Mirror, wallet, and identity-cost
-alike. **Verified directly against the current source: this optimization
-does not exist in the current `aiwa-core`.**
-`materializeWallet(rewardParams, orderedEvents, onProgress,
-verifyFn, contractVerifiers)` takes no prior-state argument at all —
-every call folds the *entire* ordered event list from genesis, every
-time (`aiwa-lib`'s own `AIWA._materializeWallet()` calls it this way on
-every single `balance()`/`claimable()`/`send()`). For a long-lived
-domain this is a real, currently-unaddressed cost, reintroduced during
-the split rather than preserved — worth stating exactly this plainly,
-not smoothed over as "unchanged from v2.0."
+**Wallet materialization — bounded via incremental folding.**
+`materializeWallet` now accepts an optional `baseState` to fold new
+events onto instead of replaying from genesis every call;
+`aiwa-lib`'s own `AIWA._materializeWallet()` caches the last
+materialized state and folds only what's genuinely new since. Three
+real bugs surfaced and were fixed while wiring this together with
+checkpointing specifically: (1) a checkpoint's own embedded
+`progression.lastId` named an event that pruning could delete, fixed by
+repointing it to the checkpoint's own id; (2) that fix exposed a
+pre-existing, checkpoint-independent bug — `progression.js`'s
+causal-chain check requires a domain's last accepted progression event
+to be a *direct* parent, which silently broke the instant any other
+event (an ordinary `recordCommitment()`, unrelated to checkpointing at
+all) became the log's head in between, permanently halting
+`claimable()`'s growth from then on — fixed with a new
+`progressionParents(heads, lastId)` helper every real progression-event
+builder must route through; (3) that fix, in turn, required the
+incremental cache's own exclusion boundary to track the real, growing
+set of already-covered ids rather than just the latest heads, since the
+new helper's extra parent edge can reach past a heads-only boundary. No
+tradeoff here beyond the cache being in-memory-per-instance, not
+persisted across a reload by itself.
 
-**Unbounded full-sync payload.** `aiwa-platform`'s own `Replicator`
-sends, per `EventLog.since(knownIds)` (§3), every event a peer is
-missing in one pass on connect — for a domain with a real, large
-history, this payload grows without bound, with no tested ceiling on
-what a real transport can carry. The identical, real, open limit v2.0
-described; unchanged.
+**Unbounded full-sync payload — bounded via chunked, ACK-gated
+replication.** `aiwa-platform`'s `Replicator` no longer sends every
+missing event (`EventLog.since()`, §3) in one message on connect; it
+sorts them topologically and releases bounded chunks (`chunkSize`,
+default 100) one at a time, the next only once the previous chunk's own
+real ACK arrives — real backpressure, not a fixed delay. **Honest
+limit**: the existing `HELLO`/`HELLO_ACK` handshake independently
+computes and sends "what's missing" twice per connection by design; in
+a narrow timing race, this can cause one redundant, harmless resend of
+an already-delivered chunk (absorbed by `EventLog.append()`'s own
+idempotency, never a correctness issue) — eliminating it fully would
+mean redesigning that handshake, left as future work.
 
-None of these are addressed yet — real, open engineering work, not a
-solved problem being merely under-documented.
+Together these three real fixes close every scalability gap this
+section originally documented as open — each one found the next while
+being built, none assumed correct without a dedicated test proving it.
 
 ## 13. Causal Tick
 
@@ -791,6 +826,7 @@ event log is the safe default for a contract's own internal state.
 | Conservation (§9) | `aiwa-core` | `src/conservation.js` |
 | Denomination (§10) | `aiwa-core` | `src/units.js` |
 | Mirror (§4) | `aiwa-core` | `src/mirror.js` |
+| Checkpoints, storage bound (§12.1) | `aiwa-core` | `src/checkpoint.js` |
 | Causal Tick (§13) | `aiwa-core` | `src/causal-tick.js`, `src/weighted-median.js` |
 | Hardware roots (§13.1) | `aiwa-core` | `src/hardware-attestation.js` |
 | Relative rate (§14) | `aiwa-core` | `src/relative-rate.js` |
@@ -809,8 +845,8 @@ event log is the safe default for a contract's own internal state.
 
 ## Status
 
-310 passing tests (`aiwa-core`, including a real Rust build+run
-cross-check when a Rust toolchain is available), 72 (`aiwa-platform`),
-36 (`aiwa-lib`). Every package is independently, publicly testable;
+322 passing tests (`aiwa-core`, including a real Rust build+run
+cross-check when a Rust toolchain is available), 77 (`aiwa-platform`),
+41 (`aiwa-lib`). Every package is independently, publicly testable;
 none depends on a shared, centrally-hosted server to run its own
 suite.
