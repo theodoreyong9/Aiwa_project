@@ -189,13 +189,32 @@ actors, nor rule out a coalition fabricating consistent history together
 at real cost. It is evidence about the structure of observed history —
 not an identity oracle.
 
-## 5. Progression
+## 5. Progression — **updated**
 
 $$\mathrm{epoch}_D(n+1) = \mathrm{epoch}_D(n) + 1$$
 
-valid only if causally chained to $D$'s own last accepted transition and
-carrying a real sequential proof (§6). Progression is local:
-$\mathrm{epoch}_A$ and $\mathrm{epoch}_B$ are never directly comparable.
+valid only if causally chained to $D$'s own last accepted transition,
+carrying a real sequential proof (§6), **and signed by a real Ed25519
+key that derives $D$ itself**. Progression is local: $\mathrm{epoch}_A$
+and $\mathrm{epoch}_B$ are never directly comparable.
+
+**The signature requirement is new, and closes a real gap.** The
+sequential proof (§6) is a public, deterministic function of
+$(\mathrm{domain}, \mathrm{output}_{n-1})$ — both already visible to
+anyone watching the log — so it was never, by itself, evidence of who
+submitted the transition: anyone could compute $D$'s own next-epoch
+proof and advance $D$'s progression without $D$'s consent. Not a theft
+of value, but a real, verified griefing vector against $q_{\text{total}}$
+(§7): since $q_{\text{total}}$ never resets and sits in $r$'s own
+denominator, inflating it lowers a domain's every future reward at zero
+cost to the attacker — concretely, $r(b{=}100, q{=}1, q_{\text{total}},
+T{=}0)$ falls from $\approx 0.087$ at $q_{\text{total}}{=}1$ to
+$\approx 0.0097$ at $q_{\text{total}}{=}20000$, a real $\sim\!9\times$
+reduction imposed by a third party for free. Closed the identical way
+§7's own accrual/claim signer-scoping already is: `deriveId(signerPubkey) === D`,
+checked against a signature embedded in the payload itself
+(`buildSignedProgressionEvent`/`verifyProgressionAuthorization`), never
+against the outer event envelope alone.
 
 **Not automatic by default in every deployment, but is in this one.**
 `aiwa-lib`'s `startProgressLoop()` calls `advanceProgress()` on a real
@@ -845,7 +864,7 @@ event log is the safe default for a contract's own internal state.
 
 ## Status
 
-322 passing tests (`aiwa-core`, including a real Rust build+run
+323 passing tests (`aiwa-core`, including a real Rust build+run
 cross-check when a Rust toolchain is available), 77 (`aiwa-platform`),
 41 (`aiwa-lib`). Every package is independently, publicly testable;
 none depends on a shared, centrally-hosted server to run its own
