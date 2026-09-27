@@ -69,10 +69,48 @@
       <div class="row"><span>Address</span><span class="value" id="out-address"></span></div>
       <div class="row"><span>Identity id</span><span class="value" id="out-identity-id"></span></div>
       <button id="btn-disconnect">Disconnect</button>
-      <button id="btn-join-network">Join network</button>
+      <button id="btn-join-network">Enable networking</button>
       <span id="network-status" class="muted"></span>
+      <div id="sync-progress" hidden>
+        <div class="row"><span>Catching up since last checkpoint</span><span class="value" id="sync-progress-label">—</span></div>
+        <div class="progress-bar"><div id="sync-progress-fill"></div></div>
+      </div>
     </div>
     <div id="connect-error" class="error"></div>
+  </section>
+
+  <section id="peer-section" hidden>
+    <h2>Real peer connections</h2>
+    <p class="muted">Enabling networking joins no shared room — every connection here is a real, direct peer-to-peer link, set up once via a real offer/answer exchange over any out-of-band channel you like (QR, copy/paste, a share sheet).</p>
+    <div class="row"><span>Connected peers</span><span class="value" id="out-connected-peers">none yet</span></div>
+
+    <h3>Connect to a peer</h3>
+    <label for="peer-connect-label">A name for this connection (yours, local only)</label>
+    <input id="peer-connect-label" type="text" placeholder="e.g. alice-laptop">
+    <button id="btn-create-offer" class="primary">Create connection offer</button>
+    <div id="peer-connect-result" class="muted"></div>
+    <div id="peer-offer-share" hidden>
+      <div id="peer-offer-qr"></div>
+      <button id="btn-peer-offer-share">Share…</button>
+      <button id="btn-peer-offer-copy">Copy to clipboard</button>
+      <label for="peer-answer-blob">…then paste their answer here once they send it back</label>
+      <textarea id="peer-answer-blob" rows="3"></textarea>
+      <button id="btn-complete-connection" class="primary">Complete connection</button>
+    </div>
+
+    <h3>Accept an incoming connection</h3>
+    <button id="btn-peer-scan-offer">Scan a QR code</button>
+    <video id="peer-offer-scan-video" hidden playsinline muted style="width:100%;border-radius:8px;"></video>
+    <label for="peer-offer-blob">…or paste an offer you received</label>
+    <textarea id="peer-offer-blob" rows="3"></textarea>
+    <button id="btn-accept-offer" class="primary">Accept & generate answer</button>
+    <div id="peer-accept-result" class="muted"></div>
+    <div id="peer-answer-share" hidden>
+      <p class="muted">Send this answer back to whoever offered the connection.</p>
+      <div id="peer-answer-qr"></div>
+      <button id="btn-peer-answer-share">Share…</button>
+      <button id="btn-peer-answer-copy">Copy to clipboard</button>
+    </div>
   </section>
 
   <section id="balances-section" hidden>
@@ -158,11 +196,38 @@
   <p class="empty-hint" id="channel-empty-hint">Connect your wallet in the Wallet tab first — once a channel is open, it keeps working after disconnecting.</p>
 
   <section id="channel-section" hidden>
-    <h2>Channel — sign once, click as many times as you want</h2>
-    <p class="muted">One real signature opens a channel with a peer. No pre-funding, nothing escrowed — every click afterward signs with an already-unlocked session key alone.</p>
-    <label for="channel-peer">Peer identity id</label>
-    <input id="channel-peer" type="text">
-    <button id="btn-open-channel" class="primary">Open channel</button>
+    <h2>Channel — a real handshake, works fully offline</h2>
+    <p class="muted">A channel needs your peer's real consent, not just a click on your side. Exchange these two small blobs any way you like — QR, copy/paste, a share sheet, even fully disconnected from any network (Bluetooth, AirDrop, anything that can carry text). Once confirmed, every click afterward signs with an already-unlocked session key alone — no more root-key signature, no pre-funding, nothing escrowed.</p>
+
+    <h3>Start a channel with a peer</h3>
+    <label for="channel-request-peer">Peer identity id</label>
+    <input id="channel-request-peer" type="text">
+    <button id="btn-request-channel" class="primary">Request channel</button>
+    <div id="channel-request-result" class="muted"></div>
+    <div id="channel-request-share" hidden>
+      <p class="muted">Send this to your peer — it proves who you are and what you're proposing, and does nothing on its own until they accept it.</p>
+      <div id="channel-request-qr"></div>
+      <button id="btn-channel-request-share">Share…</button>
+      <button id="btn-channel-request-copy">Copy to clipboard</button>
+      <label for="channel-accept-blob">…then paste their accept here once they send it back</label>
+      <textarea id="channel-accept-blob" rows="3"></textarea>
+      <button id="btn-channel-confirm" class="primary">Confirm</button>
+    </div>
+
+    <h3>Accept an incoming channel request</h3>
+    <button id="btn-channel-scan-request">Scan a QR code</button>
+    <video id="channel-request-scan-video" hidden playsinline muted style="width:100%;border-radius:8px;"></video>
+    <label for="channel-request-blob">…or paste a request you received</label>
+    <textarea id="channel-request-blob" rows="3"></textarea>
+    <button id="btn-channel-accept-request" class="primary">Accept</button>
+    <div id="channel-accept-result" class="muted"></div>
+    <div id="channel-accept-share" hidden>
+      <p class="muted">Send this back to whoever requested the channel — nothing further needed on your side after that.</p>
+      <div id="channel-accept-qr"></div>
+      <button id="btn-channel-accept-share">Share…</button>
+      <button id="btn-channel-accept-copy">Copy to clipboard</button>
+    </div>
+
     <p class="muted" id="channel-disconnect-note" hidden>Still works — an open channel needs no root connection at all, not even to split an amount.</p>
     <div id="channel-open" hidden>
       <div class="row"><span>Session address</span><span class="value" id="out-channel-address"></span></div>
@@ -362,8 +427,9 @@ $('contract-code').value = STARTER_CONTRACT_TEMPLATE;
 
 let aiwa = null;
 let channel = null;
-let channelOwnerId = null; // captured at openChannel() time — aiwa.identity becomes null on disconnect, but channel operations (claim/publish) still need the real owner's id
+let channelOwnerId = null; // captured at openChannel()/requestChannel() time — aiwa.identity becomes null on disconnect, but channel operations (claim/publish) still need the real owner's id
 let displayRefreshTimer = null;
+let transport = null;
 
 function showError(el, message) { el.textContent = message ? String(message) : ''; }
 
@@ -395,6 +461,7 @@ function setConnectedGates(connected) {
   $('operations-empty-hint').hidden = connected;
   $('channel-empty-hint').hidden = connected || !!channel; // an already-open channel stays usable even disconnected
   $('contracts-empty-hint').hidden = connected;
+  $('peer-section').hidden = !connected;
   $('send-section').hidden = !connected;
   $('receive-section').hidden = !connected;
   $('voucher-section').hidden = !connected;
@@ -520,10 +587,23 @@ $('btn-connect').addEventListener('click', async () => {
     $('connected-info').hidden = false;
     $('balances-section').hidden = false;
     setConnectedGates(true);
+    // A real, potentially large backlog since the last checkpoint is
+    // folded on the FIRST balance read below — a small fold (a handful
+    // of routine events) is silent, same as before; only a real
+    // catch-up shows the bar, matching the old AIWA_chain "loading
+    // since last snapshot" UX without flashing on every 5s poll.
+    aiwa.onMaterializeProgress = (current, total) => {
+      if (total <= 5) { $('sync-progress').hidden = true; return; }
+      $('sync-progress').hidden = false;
+      $('sync-progress-label').textContent = `${current} / ${total}`;
+      $('sync-progress-fill').style.width = `${Math.round((current / total) * 100)}%`;
+      if (current >= total) setTimeout(() => { $('sync-progress').hidden = true; }, 500);
+    };
     await refreshLocalState();
     // Matches AIWA_chain's own original identity.js: progression runs
     // automatically for as long as you're connected, no manual button.
     aiwa.startProgressLoop({ onError: (err) => console.error('progress loop:', err) });
+    aiwa.startAutoCheckpoint({ onError: (err) => console.error('auto-checkpoint:', err) });
     displayRefreshTimer = setInterval(() => { if (aiwa) refreshLocalState(); }, 5000);
   } catch (err) {
     showError($('connect-error'), err.message);
@@ -544,10 +624,16 @@ $('btn-disconnect').addEventListener('click', async () => {
   $('balances-section').hidden = true;
   setConnectedGates(false);
   $('network-status').textContent = '';
+  $('sync-progress').hidden = true;
+  // leaveNetwork() (called inside aiwa.disconnect() above) already tore
+  // down the real replicator on the OLD transport — null it here too so
+  // the next ensureJoinedNetwork() call (after reconnecting) builds a
+  // fresh one instead of reusing a dead connection.
+  transport = null;
   // An already-open channel is deliberately NOT cleared here and its
   // section stays visible: it needs no root connection at all, for
   // anything, including splitting an amount — see aiwa-lib's own
-  // Channel docs. Opening a NEW channel still needs one (btn-open-channel
+  // Channel docs. Requesting a NEW channel still needs one (btn-request-channel
   // below), since issuing the one-time delegation needs the root key.
   if (channel) {
     $('channel-section').hidden = false;
@@ -557,15 +643,108 @@ $('btn-disconnect').addEventListener('click', async () => {
   }
 });
 
+function renderConnectedPeers() {
+  $('out-connected-peers').textContent = transport && transport.peers().length ? transport.peers().join(', ') : 'none yet';
+}
+
+// There is no shared "network" to join here — WebrtcTransport has no
+// relay or room concept at all. This just readies a real transport +
+// replicator so THIS wallet's own log can sync once real, individual
+// peer connections exist (see the "Real peer connections" section
+// below for how those are actually made — createOfferFor/acceptOffer/
+// completeConnection, one real out-of-band exchange per peer).
 async function ensureJoinedNetwork() {
-  if (aiwa.replicator) return;
-  const transport = new WebrtcTransport();
+  if (transport) return transport;
+  transport = new WebrtcTransport();
   await aiwa.joinNetwork(transport);
   window.__aiwaTransport = transport; // exposed for real signaling exchange via devtools/another peer — see README
-  $('network-status').textContent = `joined — real selfId: ${transport.selfId}`;
+  $('network-status').textContent = `networking enabled — your peer label: ${transport.selfId}`;
+  transport.onPeerJoin(renderConnectedPeers);
+  transport.onPeerLeave(renderConnectedPeers);
+  renderConnectedPeers();
+  return transport;
 }
 
 $('btn-join-network').addEventListener('click', ensureJoinedNetwork);
+
+let lastPeerOfferBlob = null;
+let lastPeerAnswerBlob = null;
+let pendingOfferPeerId = null;
+
+$('btn-create-offer').addEventListener('click', async () => {
+  const label = $('peer-connect-label').value.trim();
+  if (!label) return;
+  try {
+    await ensureJoinedNetwork();
+    lastPeerOfferBlob = await transport.createOfferFor(label);
+    pendingOfferPeerId = label;
+    $('peer-offer-share').hidden = false;
+    $('peer-connect-result').textContent = `offer ready for "${label}" — send it to them, then paste their answer below`;
+    try {
+      await renderQr(lastPeerOfferBlob, 'peer-offer-qr');
+    } catch (qrErr) {
+      $('peer-connect-result').textContent += ` (QR image unavailable: ${qrErr.message} — use Share/Copy instead)`;
+    }
+  } catch (err) {
+    $('peer-connect-result').textContent = `error: ${err.message}`;
+  }
+});
+
+$('btn-peer-offer-share').addEventListener('click', async () => {
+  if (navigator.share) await navigator.share({ text: lastPeerOfferBlob, title: 'AIWA connection offer' });
+  else $('peer-connect-result').textContent = 'Web Share not supported here — use Copy instead.';
+});
+$('btn-peer-offer-copy').addEventListener('click', async () => {
+  await navigator.clipboard.writeText(lastPeerOfferBlob);
+  $('peer-connect-result').textContent = 'copied to clipboard';
+});
+
+$('btn-complete-connection').addEventListener('click', async () => {
+  const answerBlob = $('peer-answer-blob').value.trim();
+  if (!answerBlob || !pendingOfferPeerId) return;
+  try {
+    await transport.completeConnection(pendingOfferPeerId, answerBlob);
+    $('peer-answer-blob').value = '';
+    $('peer-connect-result').textContent = `connected to "${pendingOfferPeerId}"`;
+    renderConnectedPeers();
+  } catch (err) {
+    $('peer-connect-result').textContent = `error: ${err.message}`;
+  }
+});
+
+$('btn-accept-offer').addEventListener('click', async () => {
+  const offerBlob = $('peer-offer-blob').value.trim();
+  if (!offerBlob) return;
+  try {
+    await ensureJoinedNetwork();
+    lastPeerAnswerBlob = await transport.acceptOffer(offerBlob);
+    $('peer-offer-blob').value = '';
+    $('peer-answer-share').hidden = false;
+    $('peer-accept-result').textContent = 'accepted — send this answer back to complete the connection';
+    renderConnectedPeers();
+    try {
+      await renderQr(lastPeerAnswerBlob, 'peer-answer-qr');
+    } catch (qrErr) {
+      $('peer-accept-result').textContent += ` (QR image unavailable: ${qrErr.message} — use Share/Copy instead)`;
+    }
+  } catch (err) {
+    $('peer-accept-result').textContent = `error: ${err.message}`;
+  }
+});
+
+$('btn-peer-answer-share').addEventListener('click', async () => {
+  if (navigator.share) await navigator.share({ text: lastPeerAnswerBlob, title: 'AIWA connection answer' });
+  else $('peer-accept-result').textContent = 'Web Share not supported here — use Copy instead.';
+});
+$('btn-peer-answer-copy').addEventListener('click', async () => {
+  await navigator.clipboard.writeText(lastPeerAnswerBlob);
+  $('peer-accept-result').textContent = 'copied to clipboard';
+});
+
+$('btn-peer-scan-offer').addEventListener('click', async () => {
+  const ok = await scanQrInto($('peer-offer-scan-video'), $('peer-offer-blob'));
+  if (!ok) $('peer-accept-result').textContent = 'Camera QR scanning is not supported in this browser — paste the offer text instead.';
+});
 
 const SOLANA_DEVNET_RPC = 'https://api.devnet.solana.com';
 
@@ -688,27 +867,99 @@ $('btn-scan').addEventListener('click', async () => {
   if (!ok) $('receive-result').textContent = 'Camera QR scanning is not supported in this browser — paste the bundle text instead.';
 });
 
-$('btn-open-channel').addEventListener('click', async () => {
-  const peer = $('channel-peer').value.trim();
+let lastChannelRequestBlob = null;
+let lastChannelAcceptBlob = null;
+
+$('btn-request-channel').addEventListener('click', async () => {
+  const peer = $('channel-request-peer').value.trim();
   if (!peer) return;
   if (!aiwa || !aiwa.identity) {
-    $('channel-log').textContent = 'error: connect first — opening a NEW channel needs the root key once, to issue its one-time delegation. An already-open channel keeps working without it.';
+    $('channel-request-result').textContent = 'error: connect first — a real request needs your root key once, to sign its one-time delegation.';
     return;
   }
   try {
-    // Opening a channel needs a real path to the peer at least once, to
-    // find them — join automatically rather than making that a separate
-    // manual step. Once open, the channel itself works fully offline.
-    await ensureJoinedNetwork();
-    channel = await aiwa.openChannel(peer);
+    // Entirely offline — no joinNetwork()/transport involved at all,
+    // just an opaque, portable blob the peer accepts however they like.
+    const { blob, channel: pendingChannel } = await aiwa.requestChannel(peer);
+    channel = pendingChannel;
     channelOwnerId = aiwa.identity.id;
+    lastChannelRequestBlob = blob;
+    $('channel-request-share').hidden = false;
+    $('channel-request-result').textContent = `request ready for ${peer} — waiting for their accept`;
+    try {
+      await renderQr(lastChannelRequestBlob, 'channel-request-qr');
+    } catch (qrErr) {
+      $('channel-request-result').textContent += ` (QR image unavailable: ${qrErr.message} — use Share/Copy instead)`;
+    }
+  } catch (err) {
+    $('channel-request-result').textContent = `error: ${err.message}`;
+  }
+});
+
+$('btn-channel-request-share').addEventListener('click', async () => {
+  if (navigator.share) await navigator.share({ text: lastChannelRequestBlob, title: 'AIWA channel request' });
+  else $('channel-request-result').textContent = 'Web Share not supported here — use Copy instead.';
+});
+$('btn-channel-request-copy').addEventListener('click', async () => {
+  await navigator.clipboard.writeText(lastChannelRequestBlob);
+  $('channel-request-result').textContent = 'copied to clipboard';
+});
+
+$('btn-channel-confirm').addEventListener('click', async () => {
+  const acceptBlob = $('channel-accept-blob').value.trim();
+  if (!acceptBlob || !channel) return;
+  try {
+    // A pure, offline crypto check — works even if you've since
+    // disconnected: no root key or network needed to confirm.
+    await channel.confirm(acceptBlob);
+    $('channel-accept-blob').value = '';
+    $('channel-request-share').hidden = true;
     $('out-channel-address').textContent = channel.address;
     $('channel-open').hidden = false;
-    $('channel-log').textContent = `channel opened for ${peer} — session address ${channel.address}\n`;
+    $('channel-log').textContent = `channel confirmed by your peer — session address ${channel.address}\n`;
     await refreshChannelBalance();
   } catch (err) {
-    $('channel-log').textContent = `error: ${err.message}`;
+    $('channel-request-result').textContent = `error: ${err.message}`;
   }
+});
+
+$('btn-channel-scan-request').addEventListener('click', async () => {
+  const ok = await scanQrInto($('channel-request-scan-video'), $('channel-request-blob'));
+  if (!ok) $('channel-accept-result').textContent = 'Camera QR scanning is not supported in this browser — paste the request text instead.';
+});
+
+$('btn-channel-accept-request').addEventListener('click', async () => {
+  const requestBlob = $('channel-request-blob').value.trim();
+  if (!requestBlob) return;
+  if (!aiwa || !aiwa.identity) {
+    $('channel-accept-result').textContent = 'error: connect first — accepting signs your real consent with your root key.';
+    return;
+  }
+  try {
+    // A pure, offline, stateless check — never touches your own log,
+    // never opens a channel of your own; it only ever proves you really
+    // are who the request names and really consent to it.
+    lastChannelAcceptBlob = await aiwa.acceptChannelRequest(requestBlob);
+    $('channel-request-blob').value = '';
+    $('channel-accept-share').hidden = false;
+    $('channel-accept-result').textContent = 'accepted — send this back to them to complete their channel';
+    try {
+      await renderQr(lastChannelAcceptBlob, 'channel-accept-qr');
+    } catch (qrErr) {
+      $('channel-accept-result').textContent += ` (QR image unavailable: ${qrErr.message} — use Share/Copy instead)`;
+    }
+  } catch (err) {
+    $('channel-accept-result').textContent = `rejected: ${err.message}`;
+  }
+});
+
+$('btn-channel-accept-share').addEventListener('click', async () => {
+  if (navigator.share) await navigator.share({ text: lastChannelAcceptBlob, title: 'AIWA channel accept' });
+  else $('channel-accept-result').textContent = 'Web Share not supported here — use Copy instead.';
+});
+$('btn-channel-accept-copy').addEventListener('click', async () => {
+  await navigator.clipboard.writeText(lastChannelAcceptBlob);
+  $('channel-accept-result').textContent = 'copied to clipboard';
 });
 
 $('btn-channel-send').addEventListener('click', async () => {

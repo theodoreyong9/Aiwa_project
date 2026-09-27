@@ -219,6 +219,20 @@ button.ghost { background: transparent; }
 }
 .log::-webkit-scrollbar { display: none; }
 
+.progress-bar {
+  height: 6px;
+  border-radius: 999px;
+  overflow: hidden;
+  background: color-mix(in srgb, var(--text) 8%, transparent);
+  margin: 6px 0 2px;
+}
+.progress-bar > div {
+  height: 100%;
+  width: 0%;
+  background: linear-gradient(135deg, var(--accent), var(--accent-2));
+  transition: width 0.2s ease;
+}
+
 /* ---------- history ---------- */
 
 .history-item {

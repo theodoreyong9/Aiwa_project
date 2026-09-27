@@ -140,7 +140,7 @@ cached, and a later offline visit is served from it.
   page is open). "Claim" moves claimable into a real, spendable claim
   with one real signature.
 - **Send AIWA**: real, signed transfers, either broadcast to a real,
-  live P2P session ("Join network", using `aiwa-platform`'s real
+  live P2P session ("Enable networking", using `aiwa-platform`'s real
   `WebrtcTransport`) or generated as a fully offline bundle — real
   signed events plus every real ancestor event a stranger with zero
   prior sync would need, encoded as a compact string. "Max" fills in
@@ -151,11 +151,37 @@ cached, and a later offline visit is served from it.
   events to an already-connected peer, and even after that fix, never
   bundled the full ancestor chain a peer without prior sync needed) —
   found and fixed in `aiwa-lib`, then re-verified directly against
-  THIS page's own "Join network"/"Send over the network" buttons: two
-  real, separate browser contexts, real WebRTC, peers connected before
-  any funding or sending happened (the exact ordering that was
+  THIS page's own "Enable networking"/"Send over the network" buttons:
+  two real, separate browser contexts, real WebRTC, peers connected
+  before any funding or sending happened (the exact ordering that was
   silently broken before), a real send through the actual UI button,
   and the recipient's own real balance updating correctly.
+- **Real peer connections**: there is no shared "network" to join —
+  `WebrtcTransport.connect()` is a literal no-op, since this transport
+  has no relay or room concept at all. "Enable networking" only readies
+  a real transport + replicator; every actual connection is made one
+  peer at a time via a real offer/answer exchange, exposed directly in
+  the UI (Wallet tab, "Real peer connections"): **Connect to a peer**
+  creates a real offer (`WebrtcTransport.createOfferFor`) to send your
+  peer any way you like (QR, copy/paste, a share sheet), then completes
+  the connection once you paste their real answer back
+  (`completeConnection`); **Accept an incoming connection** does the
+  reverse (`acceptOffer`) for whoever received your offer. Verified live
+  via Playwright: two real, separate browser contexts exchange a real
+  offer and answer entirely through the UI's own Share/Copy buttons (no
+  test-only backdoor), and each ends up with the other in its real
+  connected-peers list.
+- **Catching up since last checkpoint**: connecting shows a real
+  progress bar while a genuinely large backlog since your last local
+  checkpoint is folded (`aiwa.onMaterializeProgress`, wired straight
+  through to `aiwa-lib`'s own materialization) — the same concern the
+  original AIWA_chain's "loading since last snapshot" indicator
+  addressed, for the same reason: an unbounded, unsynced backlog is a
+  real, unbounded-time replay from genesis on a cold load. A small,
+  routine fold stays silent, same as before. `aiwa.startAutoCheckpoint()`
+  now also runs automatically once connected, so that backlog stays
+  bounded going forward instead of growing indefinitely between
+  checkpoints.
 - **Receive**: pastes or scans (via the browser's native
   `BarcodeDetector`, where supported) a real offline bundle and appends
   it — real signature and causal verification, identical to any other
@@ -171,16 +197,34 @@ cached, and a later offline visit is served from it.
   new double-spend logic. Same "detection via reconciliation" honest
   limit as any offline send: two people can each locally believe they
   redeemed it until their logs sync.
-- **Channel — sign once, click as many times as you want**: opens a
-  real, per-peer delegated-send session (`aiwa-core`'s own real
-  delegation mechanism) with ONE real signature from your root key, no
-  pre-funding, nothing escrowed. Every subsequent click signs with an
+- **Channel — a real handshake, works fully offline**: a channel needs
+  your peer's real consent, not just a click on your own side.
+  **Request channel** issues a real, one-time delegation from your root
+  key and hands you a small, portable blob to send your peer any way
+  you like — QR, copy/paste, a share sheet, even fully disconnected
+  from any network (Bluetooth, AirDrop, anything that can carry text).
+  **Accept an incoming channel request** lets your peer verify that
+  delegation is real and sign their own real consent back, entirely
+  offline and without touching their own log. Pasting that accept back
+  into **Confirm** — itself a pure offline check, no root key or
+  network needed — is what actually makes the channel usable: three
+  concrete checks close the gap the old, unilateral single-click
+  `openChannel()` (still available as an `aiwa-lib` API, and still used
+  standalone by [`examples/channel-contract.html`](examples/channel-contract.html))
+  left open — an accept must be for THIS exact request, must really be
+  signed by whoever it claims, and must really come from the peer this
+  channel was opened for, not any third party who merely saw the
+  request blob. Once confirmed, every click afterward signs with an
   already-unlocked, real, deterministic session key alone — recoverable
   even after a crash, since it's derived from your own root key plus
   the peer's id, never randomly generated. Genuinely self-sufficient
   once open: clicking **Disconnect** does not stop it — a click that
   needs splitting a claim into the exact amount still works, real
   delegated split and all, with no root key involved for any amount.
+  Verified live via Playwright: two real, separate browser contexts
+  exchange a real request and accept entirely through the UI's own
+  Share/Copy buttons, and the requester's channel becomes usable only
+  after the real accept comes back.
 - **Publish a contract / Browse contracts**: publishes a real, signed,
   addressable bundle via `aiwa-platform`'s own real `publishBundle` —
   real content-addressed dedup, real version history, a real fork
