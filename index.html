@@ -41,21 +41,17 @@
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7a2 2 0 0 1 2-2h11a2 2 0 0 1 2 2v1"/><path d="M3 7v10a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V10a2 2 0 0 0-2-2H5a2 2 0 0 1-2-2Z"/><circle cx="16.5" cy="13.5" r="1.25" fill="currentColor" stroke="none"/></svg>
     <span>Wallet</span>
   </button>
-  <button type="button" data-view="operations">
+  <button type="button" data-view="actions">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3 4 7l4 4"/><path d="M4 7h11a4 4 0 0 1 4 4v1"/><path d="M16 21l4-4-4-4"/><path d="M20 17H9a4 4 0 0 1-4-4v-1"/></svg>
-    <span>Operations</span>
+    <span>Actions</span>
   </button>
-  <button type="button" data-view="channel">
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="6" cy="12" r="3"/><circle cx="18" cy="6" r="3"/><circle cx="18" cy="18" r="3"/><path d="M8.6 10.5 15.4 7.5"/><path d="M8.6 13.5 15.4 16.5"/></svg>
-    <span>Channel</span>
-  </button>
-  <button type="button" data-view="contracts">
+  <button type="button" data-view="browse">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 8-4 4 4 4"/><path d="m15 8 4 4-4 4"/></svg>
-    <span>Contracts</span>
+    <span>Browse</span>
   </button>
 </nav>
 
-<!-- ============ VIEW: WALLET ============ -->
+<!-- ============ VIEW: WALLET — identity + connection only ============ -->
 <div class="view" id="view-wallet" data-view="wallet">
 
   <section id="connect-section">
@@ -113,91 +109,9 @@
     </div>
   </section>
 
-  <section id="balances-section" hidden>
-    <h2>Solana Devnet</h2>
-    <div class="row"><span>SOL balance</span><span class="value" id="out-sol-balance">—</span></div>
-    <button id="btn-refresh-sol">Refresh</button>
-    <label for="burn-amount">Burn & commit (SOL, real, irreversible — Solana's own incinerator address, immediately committed as your real AIWA capital)</label>
-    <input id="burn-amount" type="number" step="0.001" min="0" placeholder="0.01">
-    <button id="btn-burn" class="primary">Burn</button>
-    <div id="burn-result" class="muted"></div>
-
-    <h2 style="margin-top:20px">AIWA</h2>
-    <div class="row"><span>Spendable now</span><span class="value" id="out-spendable">—</span></div>
-    <div class="row"><span>Claimable (not yet spendable)</span><span class="value" id="out-claimable">—</span></div>
-    <div class="row"><span class="muted">Total (spendable + claimable)</span><span class="value muted" id="out-balance">—</span></div>
-    <button id="btn-claim" class="primary">Claim</button>
-    <p class="muted" style="margin-top:8px">Progression runs automatically while connected — no button needed, just like the original AIWA_chain.</p>
-  </section>
-
-</div>
-
-<!-- ============ VIEW: OPERATIONS ============ -->
-<div class="view" id="view-operations" data-view="operations" hidden>
-  <p class="empty-hint" id="operations-empty-hint">Connect your wallet in the Wallet tab first.</p>
-
-  <section id="send-section" hidden>
-    <h2>Send AIWA</h2>
-    <label for="send-to">Recipient identity id</label>
-    <input id="send-to" type="text" placeholder="the recipient's real identity id">
-    <label for="send-amount">Amount (up to what's spendable now — see Wallet tab)</label>
-    <input id="send-amount" type="text" placeholder="1.5">
-    <button id="btn-send-network" class="primary">Send over the network</button>
-    <button id="btn-send-offline">Generate offline bundle (QR)</button>
-    <div id="qr"></div>
-    <div id="send-share" hidden>
-      <button id="btn-share">Share…</button>
-      <button id="btn-copy-blob">Copy to clipboard</button>
-    </div>
-    <div id="send-result" class="muted"></div>
-  </section>
-
-  <section id="receive-section" hidden>
-    <h2>Receive</h2>
-    <button id="btn-scan">Scan a QR code</button>
-    <video id="scan-video" hidden playsinline muted style="width:100%;border-radius:8px;"></video>
-    <label for="receive-blob">…or paste a received bundle</label>
-    <textarea id="receive-blob" rows="3"></textarea>
-    <button id="btn-receive" class="primary">Receive</button>
-    <div id="receive-result" class="muted"></div>
-  </section>
-
-  <section id="voucher-section" hidden>
-    <h2>Withdraw — a real bearer QR</h2>
-    <p class="muted">Generates a real withdrawal code redeemable by whoever scans it first — no pre-funding, nothing escrowed. The code can be freely copied; only the first real redemption succeeds.</p>
-    <label for="voucher-amount">Amount</label>
-    <input id="voucher-amount" type="text" placeholder="5.0">
-    <button id="btn-issue-voucher" class="primary">Create withdrawal QR</button>
-    <div id="voucher-issue-result" class="muted"></div>
-    <div id="voucher-qr"></div>
-    <div id="voucher-share" hidden>
-      <button id="btn-voucher-share">Share…</button>
-      <button id="btn-voucher-copy">Copy to clipboard</button>
-    </div>
-
-    <h3>Redeem a withdrawal code</h3>
-    <button id="btn-scan-voucher">Scan a QR code</button>
-    <video id="voucher-scan-video" hidden playsinline muted style="width:100%;border-radius:8px;"></video>
-    <label for="voucher-redeem-blob">…or paste a withdrawal code</label>
-    <textarea id="voucher-redeem-blob" rows="3"></textarea>
-    <button id="btn-redeem-voucher" class="primary">Redeem</button>
-    <div id="voucher-redeem-result" class="muted"></div>
-  </section>
-
-  <section id="history-section" hidden>
-    <h2>History</h2>
-    <button type="button" id="btn-refresh-history" class="ghost">Refresh</button>
-    <div id="history-list"><p class="empty-hint">Nothing yet.</p></div>
-  </section>
-</div>
-
-<!-- ============ VIEW: CHANNEL ============ -->
-<div class="view" id="view-channel" data-view="channel" hidden>
-  <p class="empty-hint" id="channel-empty-hint">Connect your wallet in the Wallet tab first — once a channel is open, it keeps working after disconnecting.</p>
-
-  <section id="channel-section" hidden>
-    <h2>Channel — a real handshake, works fully offline</h2>
-    <p class="muted">A channel needs your peer's real consent, not just a click on your side. Exchange these two small blobs any way you like — QR, copy/paste, a share sheet, even fully disconnected from any network (Bluetooth, AirDrop, anything that can carry text). Once confirmed, every click afterward signs with an already-unlocked session key alone — no more root-key signature, no pre-funding, nothing escrowed.</p>
+  <section id="channel-handshake-section" hidden>
+    <h2>Open a channel — a real handshake, QR-first, works fully offline</h2>
+    <p class="muted">A channel needs your peer's real consent, not just a click on your side. Show the QR on screen, have your peer scan it with a camera — that alone is the "offline" transport, no network and no Bluetooth pairing needed (copy/paste and a share sheet work too). Once confirmed, the channel's own actions appear in the Actions tab, under "Session payment", "QR cash-out" and "Smart contract".</p>
 
     <h3>Start a channel with a peer</h3>
     <label for="channel-request-peer">Peer identity id</label>
@@ -205,11 +119,13 @@
     <button id="btn-request-channel" class="primary">Request channel</button>
     <div id="channel-request-result" class="muted"></div>
     <div id="channel-request-share" hidden>
-      <p class="muted">Send this to your peer — it proves who you are and what you're proposing, and does nothing on its own until they accept it.</p>
+      <p class="muted">Show this QR to your peer (or send it any way you like) — it proves who you are and what you're proposing, and does nothing on its own until they accept it.</p>
       <div id="channel-request-qr"></div>
       <button id="btn-channel-request-share">Share…</button>
       <button id="btn-channel-request-copy">Copy to clipboard</button>
-      <label for="channel-accept-blob">…then paste their accept here once they send it back</label>
+      <label for="channel-accept-blob">…then scan or paste their accept here once they send it back</label>
+      <button id="btn-channel-scan-accept">Scan a QR code</button>
+      <video id="channel-accept-scan-video" hidden playsinline muted style="width:100%;border-radius:8px;"></video>
       <textarea id="channel-accept-blob" rows="3"></textarea>
       <button id="btn-channel-confirm" class="primary">Confirm</button>
     </div>
@@ -222,14 +138,55 @@
     <button id="btn-channel-accept-request" class="primary">Accept</button>
     <div id="channel-accept-result" class="muted"></div>
     <div id="channel-accept-share" hidden>
-      <p class="muted">Send this back to whoever requested the channel — nothing further needed on your side after that.</p>
+      <p class="muted">Show this QR back to whoever requested the channel — nothing further needed on your side after that.</p>
       <div id="channel-accept-qr"></div>
       <button id="btn-channel-accept-share">Share…</button>
       <button id="btn-channel-accept-copy">Copy to clipboard</button>
     </div>
+    <p class="muted" id="channel-disconnect-note" hidden>An open channel needs no root connection at all, for anything — it keeps working after Disconnect above.</p>
+  </section>
 
-    <p class="muted" id="channel-disconnect-note" hidden>Still works — an open channel needs no root connection at all, not even to split an amount.</p>
-    <div id="channel-open" hidden>
+</div>
+
+<!-- ============ VIEW: ACTIONS — the same five things, whether connected, in a channel, or both ============ -->
+<div class="view" id="view-actions" data-view="actions" hidden>
+  <p class="empty-hint" id="actions-empty-hint">Connect your wallet in the Wallet tab first (or open a channel — it works fully offline too).</p>
+
+  <section id="payment-section" hidden>
+    <h2>Payment</h2>
+    <h3>Send AIWA</h3>
+    <label for="send-to">Recipient identity id</label>
+    <input id="send-to" type="text" placeholder="the recipient's real identity id">
+    <label for="send-amount">Amount (up to what's spendable now — see Mining below)</label>
+    <input id="send-amount" type="text" placeholder="1.5">
+    <button id="btn-send-network" class="primary">Send over the network</button>
+    <button id="btn-send-offline">Generate offline bundle (QR)</button>
+    <div id="qr"></div>
+    <div id="send-share" hidden>
+      <button id="btn-share">Share…</button>
+      <button id="btn-copy-blob">Copy to clipboard</button>
+    </div>
+    <div id="send-result" class="muted"></div>
+
+    <h3>Receive</h3>
+    <button id="btn-scan">Scan a QR code</button>
+    <video id="scan-video" hidden playsinline muted style="width:100%;border-radius:8px;"></video>
+    <label for="receive-blob">…or paste a received bundle</label>
+    <textarea id="receive-blob" rows="3"></textarea>
+    <button id="btn-receive" class="primary">Receive</button>
+    <div id="receive-result" class="muted"></div>
+  </section>
+
+  <section id="history-section" hidden>
+    <h2>History</h2>
+    <button type="button" id="btn-refresh-history" class="ghost">Refresh</button>
+    <div id="history-list"><p class="empty-hint">Nothing yet.</p></div>
+  </section>
+
+  <section id="session-payment-section" hidden>
+    <h2>Session payment — sign once, click as many times as you want</h2>
+    <p class="empty-hint" id="session-payment-empty-hint">No channel open yet — open one from the Wallet tab.</p>
+    <div id="session-payment-controls" hidden>
       <div class="row"><span>Session address</span><span class="value" id="out-channel-address"></span></div>
       <div class="row"><span>Owner balance (via this channel)</span><span class="value" id="out-channel-balance">—</span></div>
       <label for="channel-amount">Amount per click</label>
@@ -252,9 +209,35 @@
       <textarea id="channel-receive-blob" rows="3"></textarea>
       <button id="btn-channel-receive" class="primary">Receive</button>
       <div id="channel-receive-result" class="muted"></div>
+    </div>
+  </section>
 
-      <h3>Withdraw — a real bearer QR</h3>
-      <p class="muted">Generates a real withdrawal code redeemable by whoever scans it first, through this channel — no pre-funding, nothing escrowed.</p>
+  <section id="cashout-section" hidden>
+    <h2>QR cash-out — a real bearer QR</h2>
+    <p class="muted">Generates a real withdrawal code redeemable by whoever scans it first — no pre-funding, nothing escrowed. The code can be freely copied; only the first real redemption succeeds.</p>
+
+    <div id="cashout-identity" hidden>
+      <h3>From your identity</h3>
+      <label for="voucher-amount">Amount</label>
+      <input id="voucher-amount" type="text" placeholder="5.0">
+      <button id="btn-issue-voucher" class="primary">Create withdrawal QR</button>
+      <div id="voucher-issue-result" class="muted"></div>
+      <div id="voucher-qr"></div>
+      <div id="voucher-share" hidden>
+        <button id="btn-voucher-share">Share…</button>
+        <button id="btn-voucher-copy">Copy to clipboard</button>
+      </div>
+      <h4>Redeem a withdrawal code</h4>
+      <button id="btn-scan-voucher">Scan a QR code</button>
+      <video id="voucher-scan-video" hidden playsinline muted style="width:100%;border-radius:8px;"></video>
+      <label for="voucher-redeem-blob">…or paste a withdrawal code</label>
+      <textarea id="voucher-redeem-blob" rows="3"></textarea>
+      <button id="btn-redeem-voucher" class="primary">Redeem</button>
+      <div id="voucher-redeem-result" class="muted"></div>
+    </div>
+
+    <div id="cashout-channel" hidden>
+      <h3>From your channel</h3>
       <label for="channel-voucher-amount">Amount</label>
       <input id="channel-voucher-amount" type="text" placeholder="5.0">
       <button id="btn-channel-issue-voucher" class="primary">Create withdrawal QR</button>
@@ -271,8 +254,45 @@
       <textarea id="channel-voucher-redeem-blob" rows="3"></textarea>
       <button id="btn-channel-redeem-voucher" class="primary">Redeem</button>
       <div id="channel-voucher-redeem-result" class="muted"></div>
+    </div>
+  </section>
 
-      <h3>Publish a contract</h3>
+  <section id="mining-section" hidden>
+    <h2>Mining</h2>
+    <h3>Solana Devnet</h3>
+    <div class="row"><span>SOL balance</span><span class="value" id="out-sol-balance">—</span></div>
+    <button id="btn-refresh-sol">Refresh</button>
+    <label for="burn-amount">Burn & commit (SOL, real, irreversible — Solana's own incinerator address, immediately committed as your real AIWA capital)</label>
+    <input id="burn-amount" type="number" step="0.001" min="0" placeholder="0.01">
+    <button id="btn-burn" class="primary">Burn</button>
+    <div id="burn-result" class="muted"></div>
+
+    <h3 style="margin-top:20px">AIWA</h3>
+    <div class="row"><span>Spendable now</span><span class="value" id="out-spendable">—</span></div>
+    <div class="row"><span>Claimable (not yet spendable)</span><span class="value" id="out-claimable">—</span></div>
+    <div class="row"><span class="muted">Total (spendable + claimable)</span><span class="value muted" id="out-balance">—</span></div>
+    <button id="btn-claim" class="primary">Claim</button>
+    <p class="muted" style="margin-top:8px">Progression runs automatically while connected — no button needed, just like the original AIWA_chain.</p>
+  </section>
+
+  <section id="smart-contract-section" hidden>
+    <h2>Smart contract</h2>
+
+    <div id="publish-identity" hidden>
+      <h3>Publish as yourself</h3>
+      <p class="muted">Publishes a real, signed, addressable bundle (aiwa-platform's own real publish mechanism) — discoverable by its own address or by yours, real content-addressed dedup and version history included. Runs later in its own isolated, sandboxed context — never inside this wallet's own page, so it can never read your identity here.</p>
+      <label for="contract-name">Name</label>
+      <input id="contract-name" type="text" placeholder="my-token">
+      <label for="contract-version">Version</label>
+      <input id="contract-version" type="text" placeholder="1.0.0" value="1.0.0">
+      <label for="contract-code">A single, self-contained index.html — it runs at its own opaque origin, so it must load its own dependencies from a CDN (e.g. esm.sh), never from this page's local files.</label>
+      <textarea id="contract-code" rows="18"></textarea>
+      <button id="btn-publish-contract" class="primary">Publish</button>
+      <div id="publish-result" class="muted"></div>
+    </div>
+
+    <div id="publish-channel" hidden>
+      <h3>Publish via your channel</h3>
       <p class="muted">Publishes through this channel's own session identity — works fully disconnected too. Honest limit: discoverable by address, but "list by creator" for your root id won't find it (real, cryptographic authorship is the channel's session identity here) — see this app's README.</p>
       <label for="channel-contract-name">Name</label>
       <input id="channel-contract-name" type="text" placeholder="my-token">
@@ -286,22 +306,9 @@
   </section>
 </div>
 
-<!-- ============ VIEW: CONTRACTS ============ -->
-<div class="view" id="view-contracts" data-view="contracts" hidden>
-  <p class="empty-hint" id="contracts-empty-hint">Connect your wallet in the Wallet tab first.</p>
-
-  <section id="publish-section" hidden>
-    <h2>Publish a contract</h2>
-    <p class="muted">Publishes a real, signed, addressable bundle (aiwa-platform's own real publish mechanism) — discoverable by its own address or by yours, real content-addressed dedup and version history included. Runs later in its own isolated, sandboxed context — never inside this wallet's own page, so it can never read your identity here.</p>
-    <label for="contract-name">Name</label>
-    <input id="contract-name" type="text" placeholder="my-token">
-    <label for="contract-version">Version</label>
-    <input id="contract-version" type="text" placeholder="1.0.0" value="1.0.0">
-    <label for="contract-code">A single, self-contained index.html — it runs at its own opaque origin, so it must load its own dependencies from a CDN (e.g. esm.sh), never from this page's local files.</label>
-    <textarea id="contract-code" rows="18"></textarea>
-    <button id="btn-publish-contract" class="primary">Publish</button>
-    <div id="publish-result" class="muted"></div>
-  </section>
+<!-- ============ VIEW: BROWSE — read-only discovery ============ -->
+<div class="view" id="view-browse" data-view="browse" hidden>
+  <p class="empty-hint" id="browse-empty-hint">Connect your wallet in the Wallet tab first.</p>
 
   <section id="browse-section" hidden>
     <h2>Browse contracts</h2>
@@ -427,7 +434,7 @@ $('contract-code').value = STARTER_CONTRACT_TEMPLATE;
 
 let aiwa = null;
 let channel = null;
-let channelOwnerId = null; // captured at openChannel()/requestChannel() time — aiwa.identity becomes null on disconnect, but channel operations (claim/publish) still need the real owner's id
+let channelOwnerId = null; // captured at requestChannel() time — aiwa.identity becomes null on disconnect, but channel operations (claim/publish) still need the real owner's id
 let displayRefreshTimer = null;
 let transport = null;
 
@@ -451,23 +458,46 @@ function switchView(name) {
   for (const view of document.querySelectorAll('.view')) {
     view.hidden = view.dataset.view !== name;
   }
-  if (name === 'operations' && aiwa) renderHistory();
+  if (name === 'actions' && aiwa) renderHistory();
 }
 for (const btn of document.querySelectorAll('#app-nav button')) {
   btn.addEventListener('click', () => switchView(btn.dataset.view));
 }
 
-function setConnectedGates(connected) {
-  $('operations-empty-hint').hidden = connected;
-  $('channel-empty-hint').hidden = connected || !!channel; // an already-open channel stays usable even disconnected
-  $('contracts-empty-hint').hidden = connected;
+/**
+ * The single source of truth for what's visible where — driven by two
+ * real, independent facts: are we connected (a root key in memory), and
+ * is there a real, CONFIRMED channel (usable for send/claim/voucher/
+ * publish; a still-pending one only lets the handshake itself proceed).
+ * Called after every state change (connect, disconnect, channel
+ * confirmed) instead of each call site hand-toggling its own corner of
+ * the UI — that duplication is exactly what made "channel" and
+ * "connected" drift into two separate, inconsistent flows before.
+ */
+function updateGates() {
+  const connected = !!(aiwa && aiwa.identity);
+  const hasChannel = !!channel; // pending or confirmed — enough to keep the handshake reachable
+  const channelUsable = !!(channel && channel.status === 'confirmed');
+
   $('peer-section').hidden = !connected;
-  $('send-section').hidden = !connected;
-  $('receive-section').hidden = !connected;
-  $('voucher-section').hidden = !connected;
+  $('channel-handshake-section').hidden = !connected && !hasChannel;
+  $('channel-disconnect-note').hidden = !(hasChannel && !connected);
+
+  $('actions-empty-hint').hidden = connected || channelUsable;
+  $('payment-section').hidden = !connected;
   $('history-section').hidden = !connected;
-  $('channel-section').hidden = !connected && !channel; // an already-open channel keeps its section visible even disconnected
-  $('publish-section').hidden = !connected;
+  $('session-payment-section').hidden = !connected && !channelUsable;
+  $('session-payment-empty-hint').hidden = channelUsable;
+  $('session-payment-controls').hidden = !channelUsable;
+  $('cashout-section').hidden = !connected && !channelUsable;
+  $('cashout-identity').hidden = !connected;
+  $('cashout-channel').hidden = !channelUsable;
+  $('mining-section').hidden = !connected;
+  $('smart-contract-section').hidden = !connected && !channelUsable;
+  $('publish-identity').hidden = !connected;
+  $('publish-channel').hidden = !channelUsable;
+
+  $('browse-empty-hint').hidden = connected;
   $('browse-section').hidden = !connected;
 }
 
@@ -585,13 +615,15 @@ $('btn-connect').addEventListener('click', async () => {
     await aiwa.connect(mnemonic ? { mnemonic } : {});
     $('connect-form').hidden = true;
     $('connected-info').hidden = false;
-    $('balances-section').hidden = false;
-    setConnectedGates(true);
+    updateGates();
     // A real, potentially large backlog since the last checkpoint is
     // folded on the FIRST balance read below — a small fold (a handful
     // of routine events) is silent, same as before; only a real
     // catch-up shows the bar, matching the old AIWA_chain "loading
-    // since last snapshot" UX without flashing on every 5s poll.
+    // since last snapshot" UX. Progress updates are throttled by real
+    // elapsed time in aiwa-core, not by a fixed event count, so the bar
+    // keeps moving even through one slow event (a real VDF
+    // re-verification) instead of looking frozen until it's all done.
     aiwa.onMaterializeProgress = (current, total) => {
       if (total <= 5) { $('sync-progress').hidden = true; return; }
       $('sync-progress').hidden = false;
@@ -621,8 +653,6 @@ $('btn-disconnect').addEventListener('click', async () => {
   displayRefreshTimer = null;
   $('connect-form').hidden = false;
   $('connected-info').hidden = true;
-  $('balances-section').hidden = true;
-  setConnectedGates(false);
   $('network-status').textContent = '';
   $('sync-progress').hidden = true;
   // leaveNetwork() (called inside aiwa.disconnect() above) already tore
@@ -630,17 +660,12 @@ $('btn-disconnect').addEventListener('click', async () => {
   // the next ensureJoinedNetwork() call (after reconnecting) builds a
   // fresh one instead of reusing a dead connection.
   transport = null;
-  // An already-open channel is deliberately NOT cleared here and its
-  // section stays visible: it needs no root connection at all, for
-  // anything, including splitting an amount — see aiwa-lib's own
-  // Channel docs. Requesting a NEW channel still needs one (btn-request-channel
-  // below), since issuing the one-time delegation needs the root key.
-  if (channel) {
-    $('channel-section').hidden = false;
-    $('channel-disconnect-note').hidden = false;
-    $('channel-empty-hint').hidden = true;
-    refreshChannelBalance();
-  }
+  // An already-confirmed channel is deliberately NOT cleared here: it
+  // needs no root connection at all, for anything, including splitting
+  // an amount — see aiwa-lib's own Channel docs. updateGates() below
+  // keeps its Actions-tab sections visible on that basis alone.
+  updateGates();
+  if (channel) refreshChannelBalance();
 });
 
 function renderConnectedPeers() {
@@ -886,6 +911,7 @@ $('btn-request-channel').addEventListener('click', async () => {
     lastChannelRequestBlob = blob;
     $('channel-request-share').hidden = false;
     $('channel-request-result').textContent = `request ready for ${peer} — waiting for their accept`;
+    updateGates();
     try {
       await renderQr(lastChannelRequestBlob, 'channel-request-qr');
     } catch (qrErr) {
@@ -904,6 +930,10 @@ $('btn-channel-request-copy').addEventListener('click', async () => {
   await navigator.clipboard.writeText(lastChannelRequestBlob);
   $('channel-request-result').textContent = 'copied to clipboard';
 });
+$('btn-channel-scan-accept').addEventListener('click', async () => {
+  const ok = await scanQrInto($('channel-accept-scan-video'), $('channel-accept-blob'));
+  if (!ok) $('channel-request-result').textContent = 'Camera QR scanning is not supported in this browser — paste the accept text instead.';
+});
 
 $('btn-channel-confirm').addEventListener('click', async () => {
   const acceptBlob = $('channel-accept-blob').value.trim();
@@ -914,9 +944,9 @@ $('btn-channel-confirm').addEventListener('click', async () => {
     await channel.confirm(acceptBlob);
     $('channel-accept-blob').value = '';
     $('channel-request-share').hidden = true;
-    $('out-channel-address').textContent = channel.address;
-    $('channel-open').hidden = false;
     $('channel-log').textContent = `channel confirmed by your peer — session address ${channel.address}\n`;
+    $('out-channel-address').textContent = channel.address;
+    updateGates();
     await refreshChannelBalance();
   } catch (err) {
     $('channel-request-result').textContent = `error: ${err.message}`;
@@ -1213,6 +1243,8 @@ $('btn-scan-voucher').addEventListener('click', async () => {
   const ok = await scanQrInto($('voucher-scan-video'), $('voucher-redeem-blob'));
   if (!ok) $('voucher-redeem-result').textContent = 'Camera QR scanning is not supported in this browser — paste the code instead.';
 });
+
+updateGates();
 
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {

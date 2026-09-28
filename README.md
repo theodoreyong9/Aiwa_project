@@ -59,35 +59,61 @@ python3 -m http.server 8080   # from this repo's own root — ES modules and Ind
 ```
 then open `http://127.0.0.1:8080/index.html`.
 
-## Interface: four tabs, installable
+## Interface: three tabs, installable
 
-The page is organized into four tabs (`Wallet`, `Operations`,
-`Channel`, `Contracts`) behind a responsive nav — icon+label side by
-side on wider screens, icon-above-label once the viewport gets narrow
-enough that the two wouldn't both fit. `Wallet` holds Connect and both
-balance panels; `Operations` holds Send/Receive/Withdraw plus a real
-**History** panel (below); `Contracts` is unchanged in substance, just
-its own tab now.
+The page is organized into three tabs (`Wallet`, `Actions`, `Browse`)
+behind a responsive nav — icon+label side by side on wider screens,
+icon-above-label once the viewport gets narrow enough that the two
+wouldn't both fit.
 
-**`Channel` is a real, standalone wallet once open** — not just
-Send. Opening a channel needs the root key once (its one-time
-delegation); every real capability below it needs no root connection
-at all afterward, exactly mirroring `aiwa-lib`'s own `Channel` API:
-Send, **Claim** (moves currently-claimable value into a real,
-spendable claim for the real owner), **Receive a bundle** (accepts an
-already-signed incoming transfer — this one never actually needed a
-channel at all, since `aiwa.receiveOfflineBundle()` never signs with
-your own key, but lives here so every disconnected-capable action is
-in one place), **Withdraw** (issue a real bearer QR redeemable by
-whoever scans it first, and redeem one, both through the channel),
-and **Publish a contract** (through the channel's own session
-identity — see `aiwa-lib`'s own README for the honest limit this
-carries: discoverable by address, but not via "list by creator" for
-your root id, since the real cryptographic author is the channel's
-session identity here). Verified live, through this exact UI, fully
-disconnected: claim, receive, issue+redeem a voucher, and publish (and
-have it show up in `Contracts`' own browse-by-address) all work with
-no root identity connected.
+**`Wallet` is purely about identity and connectivity** — Connect,
+"Real peer connections" (the actual `createOfferFor`/`acceptOffer`/
+`completeConnection` primitives, see above), and "Open a channel" (the
+real request/accept/confirm handshake, see above). Nothing here moves
+value or publishes anything; it only ever gets you connected, one way
+or another.
+
+**`Actions` is one place for the five things a wallet actually does —
+Payment, Session payment, QR cash-out, Mining, Smart contract — and
+each behaves the same whether you're connected to the network, have a
+confirmed channel open, or both.** This replaced an earlier design
+where a channel's capabilities lived in their own separate tab,
+duplicating Send/Withdraw/Publish under different names — the real
+complaint that shipped this rewrite: two different-looking flows for
+the same kind of action, depending on which tab you happened to be in.
+Now each section shows whichever half of it actually applies:
+
+- **Payment** — Send AIWA (network or a fully offline QR bundle) and
+  Receive, using your root key. Gated on being connected.
+- **Session payment** — the channel's own Send/Claim/Receive, using
+  its already-unlocked session key. Gated on having a real, CONFIRMED
+  channel (see `Wallet`'s handshake above) — a hint tells you to open
+  one first if you don't have one yet.
+- **QR cash-out** — issue/redeem a real bearer voucher, "From your
+  identity" (root key) and/or "From your channel" (session key),
+  whichever applies, shown side by side rather than on separate tabs.
+- **Mining** — the real Solana burn (ignites your AIWA capital) plus
+  claimable/spendable/claim. Gated on being connected, same as Payment.
+- **Smart contract** — publish, "as yourself" (root identity) and/or
+  "via your channel" (the channel's own session identity — see
+  `aiwa-lib`'s own README for the honest limit this carries:
+  discoverable by address, but not via "list by creator" for your root
+  id, since the real cryptographic author is the channel's session
+  identity here).
+
+**A confirmed channel is a real, standalone wallet** — none of its
+Actions-tab sections need a root connection at all once confirmed,
+exactly mirroring `aiwa-lib`'s own `Channel` API. Verified live,
+through this exact UI, fully disconnected: session-payment send,
+claim, receive, issue+redeem a voucher, and publish (and have it show
+up in `Browse`) all keep working with no root identity connected — the
+UI itself reflects this directly: disconnecting hides everything
+gated on the root key while everything gated on the channel stays
+exactly where it was.
+
+**`Browse`** is unchanged in substance (look up a contract by address,
+or list everything a given identity has published) — just its own tab
+now that publishing itself lives in `Actions`.
 
 **History** is not a separate ledger kept alongside the wallet — it's
 read directly from the real event log (`aiwa.log.since([])`) on every
