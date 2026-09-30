@@ -606,44 +606,62 @@ wired into `computeCausalTick`, which is unchanged**:
 - **accusation** (rewind or fork) comes from **proofs only**; the median
   never accuses, because "far from the median" cannot tell inflation
   from legitimate offline progress.
-- Both rules see the same events: every progression event of the target
-  that fails an authenticity check (by default the signature of §5:
-  signed by the key whose id is the domain) is removed first and
-  reported, so a forged event cannot move either.
+- Both rules see the same events. When the reader holds X's history
+  **from epoch 1**, X's progression events are replayed through the
+  reducer of §5–§6 (epoch + 1, chained to the last accepted transition,
+  signed by X's key, sequential proof verified) and only the accepted
+  ones count — what anyone who verifies does. Without the genesis nothing
+  can be chained, so the check falls back to the signature alone and the
+  result says so. A fork is the one exception, on purpose: a second
+  lineage is rejected by the linear chain and is exactly the evidence of
+  one, so forks are read from the signed events.
+
+**On "X signs a fake itself".** A domain may write whatever it likes in
+its own log. That is not an attack on the protocol: it is an invalid
+history, refused by whoever verifies its sequential proof — at
+reconnection as before — and left in the DAG as a dead branch nobody
+counts. It matters here for one narrow reason: Mirror resolves a
+commitment's references against the DAG as it is, so *colluders* can
+sign commitments citing such an event, and a reader who does not replay
+the chain would take it into the **estimate** — informational, never
+applied to anyone's value. Replaying the chain closes that; a reader
+without the genesis cannot, and falls back, visibly.
 
 Compared in `experiments/triangulation-scenarios.mjs`, on synthetic
-worlds that model the threats considered (the target's events and the
-observers' commitments are really signed; the worlds are chosen by
-their author, so this is a comparison, not a proof):
+worlds that model the threats considered (the target's progression events
+are a real chain — signed, chained, real sequential proofs — and the
+observers' commitments are really signed; the worlds are chosen by their
+author, so this is a comparison, not a proof):
 
-| World | Weighted median (§13) | Proofs alone, log trusted | **Combined** |
+| World | Weighted median (§13) | Proofs alone, log trusted | **Combined** (default) |
 |---|---|---|---|
-| Honest | 100 | 100 | 100 |
-| Funded majority saw only an old state (10); one honest saw 100 | **10**; its check accuses the honest domain | 100 | **100** |
-| Unfunded observers saw an old state | 100 | 100 | 100 |
-| *Only* unfunded observers, all saw 100 | no tick | 100 | **100** |
-| X rewinds to 50; funded majority saw 50; one honest saw 100 | 50; "consistent" | contradicted | **100, accused (rewind)** |
-| X holds two unrelated histories at 100 | 100; no notion of a fork | fork | **100, accused (fork)** |
-| Observer cites an event that does not exist | 100 | 100 | 100 |
-| Only stale observers; X progressed offline to 100 | 10; accused | 10 | 10, *ahead by 90*, not accused |
-| A forged event of X (signed by someone else) in the log; funded **minority** cites it | 100 | **999999** | **100** |
-| The same, funded **majority** cites it | **999999**; accuses the honest domain | **999999** | **100** |
-| **X signs a fake far-ahead event itself, no sequential work; funded majority cites it** | **999999** | **999999** | **999999** |
+| Honest | 20 | 20 | 20 |
+| Funded majority saw only an old state (4); one honest saw 20 | **4**; its check accuses the honest domain | 20 | **20** |
+| Unfunded observers saw an old state | 20 | 20 | 20 |
+| *Only* unfunded observers, all saw 20 | no tick | 20 | **20** |
+| X rewinds to 10; funded majority saw 10; one honest saw 20 | 10; "consistent" | contradicted | **20, accused (rewind)** |
+| X holds two unrelated histories at 21 | 21; no notion of a fork | fork | **21, accused (fork)** |
+| Observer cites an event that does not exist | 20 | 20 | 20 |
+| Only stale observers; X progressed offline to 20 | 4; accused | 4 | 4, *ahead by 16*, not accused |
+| A forged event of X (signed by someone else) in the log; funded **minority** cites it | 20 | **999999** | **20** |
+| The same, funded **majority** cites it | **999999**; accuses the honest domain | **999999** | **20** |
+| X signs a fake far-ahead event itself, no sequential work; funded majority cites it | **999999** | **999999** | **20** (chain replayed, fake rejected) |
+| **The same, but the reader holds only epochs 15–20 (no genesis)** | **999999** | **999999** | **999999**, `verification: signature` |
 
 What this shows, and what it does not. The weighted median is a vote:
-enough weight on an old view moves it. Proofs are immune to observers who
-saw less, and yield rewinds and forks a vote cannot; the authenticity
-check is what stops them from being moved by a forged event, and stops a
-funded majority from moving the estimate with one. The last row is not
-covered: the signature is genuine, so a signature-only check accepts it.
-The sequential (VDF) proof is what rejects it at admission (§6); a
-caller who wants that check here passes a stricter `isAuthentic`. Other
-limits stand: no upper bound (being ahead is reported, not accused); only
-as fresh as the freshest honest observer (a keeper, §13.2, would help);
-and nothing about whether observers are distinct actors — the count of
-observers is informational, exactly like §13.1's hardware count.
-Independence is still the open question; this removes the weight from
-the accusations, not that assumption.
+enough weight on an old view moves it, and a funded majority can move it
+with an event that should never have counted. Proofs are immune to
+observers who saw less, and yield rewinds and forks a vote cannot; the
+chain replay is what stops either rule from being moved by a fake. The
+last row is what remains: with colluders, and a reader that cannot
+replay the chain, the estimate can be fooled — and the result says it
+fell back to the signature. Other limits stand: no upper bound (being
+ahead is reported, not accused); only as fresh as the freshest honest
+observer (a keeper, §13.2, would help); and nothing about whether
+observers are distinct actors — the count of observers is informational,
+exactly like §13.1's hardware count. Independence is still the open
+question; this removes the weight from the accusations, not that
+assumption.
 
 ## 14. Relative rate, without a clock
 
