@@ -289,6 +289,19 @@
       <textarea id="contract-code" rows="18"></textarea>
       <button id="btn-publish-contract" class="primary">Publish</button>
       <div id="publish-result" class="muted"></div>
+
+      <div id="publish-next" hidden>
+        <h3>Next: the YourMine sphere</h3>
+        <p class="muted">Made from the version you just published (manifest <span id="pin-manifest"></span>). The sphere holds <b>no copy</b> of the contract: it is pinned to that manifest, fetches the signed events, checks every signature and hash itself, and only then runs the code. It finds the events on this device (through a window it asks you to allow) or at the public address of an export, if you give one below. Read it, then send it to YourMine's submission field: nothing is submitted for you.</p>
+        <label for="events-url">Public address of the export (optional, https — e.g. the raw GitHub URL of the exported file)</label>
+        <input id="events-url" type="url" placeholder="https://…/my-contract.aiwa-events.json">
+        <button id="btn-export-events">Export the signed events (JSON)</button>
+        <label for="sphere-code">YourMine sphere (JS)</label>
+        <textarea id="sphere-code" rows="10" readonly></textarea>
+        <button id="btn-copy-sphere">Copy</button>
+        <button id="btn-open-yourmine" class="primary">Open YourMine's submission field with this sphere</button>
+        <div id="pin-result" class="muted"></div>
+      </div>
     </div>
 
     <div id="publish-channel" hidden>
@@ -332,6 +345,7 @@
 import { AIWA, encodeOfflineBundle, decodeOfflineBundle, fromUnits } from 'aiwa-lib';
 import { publishBundle, readBundle, latestBundle, listBundlesByAuthor } from 'aiwa-platform';
 import { WebrtcTransport } from 'aiwa-platform';
+import { buildSphere, contractMeta, exportPackage, yourMineUrl } from './sphere-loader.js';
 
 // A real deployment must choose its own real economic parameters —
 // these are the SAME placeholder values aiwa-core's own test suite
@@ -1133,8 +1147,72 @@ $('btn-publish-contract').addEventListener('click', async () => {
     });
     $('publish-result').textContent = `published — address: ${domain} (manifest ${manifestEventId})`;
     $('browse-address').value = domain;
+    offerSphere({ name, code, domain, manifestEventId });
   } catch (err) {
     $('publish-result').textContent = `error: ${err.message}`;
+  }
+});
+
+// ---------- the YourMine sphere pinned to what was just published ----------
+// A sphere does not copy the contract: it is pinned to the manifest id of this exact published version
+// (see sphere-loader.js). Generated here, after publishing, because only now are the author, the address
+// and the manifest id known.
+let published = null;
+
+function refreshSphere() {
+  if (!published) return;
+  const url = $('events-url').value.trim();
+  try {
+    const meta = contractMeta(published.code, published.name);
+    const { file, source } = buildSphere({
+      author: aiwa.identity.id, domain: published.domain, manifest: published.manifestEventId, slug: slugify(published.name),
+      title: meta.title, description: meta.description, icon: meta.icon, eventsUrl: url || null,
+    });
+    published.sphere = { file, source };
+    $('sphere-code').value = source;
+    $('pin-result').textContent = `${file} — ${source.length} characters, pinned to ${published.manifestEventId.slice(0, 12)}…`;
+  } catch (err) {
+    published.sphere = null;
+    $('sphere-code').value = '';
+    $('pin-result').textContent = `error: ${err.message}`;
+  }
+}
+
+function offerSphere(info) {
+  published = info;
+  $('pin-manifest').textContent = `${info.manifestEventId.slice(0, 12)}…`;
+  $('publish-next').hidden = false;
+  refreshSphere();
+}
+$('events-url').addEventListener('input', refreshSphere);
+
+$('btn-export-events').addEventListener('click', async () => {
+  if (!published) return;
+  const pkg = await exportPackage(aiwa.log, published.manifestEventId);
+  if (!pkg) { $('pin-result').textContent = 'error: this device does not hold that version.'; return; }
+  const link = document.createElement('a');
+  link.href = URL.createObjectURL(new Blob([JSON.stringify(pkg)], { type: 'application/json' }));
+  link.download = `${slugify(published.name)}.aiwa-events.json`;
+  document.body.append(link);
+  link.click();
+  link.remove();
+  $('pin-result').textContent = `exported ${link.download} — the manifest and its ${pkg.files.length} file event(s); host it anywhere: the sphere checks the hash, not the host.`;
+});
+
+$('btn-copy-sphere').addEventListener('click', async () => {
+  if (!published?.sphere) return;
+  try { await navigator.clipboard.writeText(published.sphere.source); $('pin-result').textContent = 'copied.'; }
+  catch { $('sphere-code').select(); $('pin-result').textContent = 'select and copy by hand — this browser refused the clipboard.'; }
+});
+
+$('btn-open-yourmine').addEventListener('click', async () => {
+  if (!published?.sphere) return;
+  try {
+    const url = await yourMineUrl(published.sphere.file, published.sphere.source);
+    const opened = window.open(url, '_blank', 'noopener');
+    if (!opened) $('pin-result').textContent = 'the browser blocked the window — use Copy and paste the sphere into YourMine (Build → Apps).';
+  } catch (err) {
+    $('pin-result').textContent = `error: ${err.message} — use Copy instead.`;
   }
 });
 
