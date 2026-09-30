@@ -454,6 +454,9 @@ coalition can produce internally consistent history at real cost. The
 claim is narrower: fabricated identities cannot fabricate authenticated
 history *for free*.
 
+Also not specified: the durability of data that no domain chooses to
+keep (§3, §13.2).
+
 ### 12.1 Scalability — three real limits, now addressed, with the honest tradeoffs each one makes
 
 Cross-domain, this scales well by construction — no consensus, no
@@ -543,6 +546,84 @@ domain may optionally strengthen independence assurance with
 physically-provisioned hardware roots; hardware never computes
 $\hat\theta_X$, never scales $w_i$, never becomes required input.
 $\geq 2$ distinct, independently-issued roots required.
+
+### 13.2 What always-on hardware is for — a design note, not implemented
+
+§13.1 is about **independence**: attesting that an observer is not
+backed solely by an actor who can fabricate identities in software.
+That is one of three different jobs that permanently connected machines
+could do. They need different things from the machine, and should stay
+separate in the design even when one box does all three:
+
+| Job | What it does | What must be trusted |
+|---|---|---|
+| **Keeper** (persistence) | Holds and re-serves content-addressed events and published bundles, so that data survives the domains that produced it. | Availability only. Integrity costs nothing to check: an id is the hash of the content (§3.1), so a keeper can withhold or lose data but cannot alter it undetected. Anyone can run one. |
+| **Witness** (independence) | An observer whose independence is attested by §13.1's two-hop chain. | The origin's issuance process, or one physical unit (§13.1, stated limit). |
+| **Rendezvous** (bootstrap) | Lets two domains that have never met find each other. | Nothing about the data; it can see who is looking for whom. |
+
+**Why persistence needs its own answer.** A participant holds only what
+is relevant to its own state and observed relationships (§3). Nothing in
+the protocol obliges anyone to keep an event, and if every domain that
+held it is gone, it is gone: the event DAG is tamper-evident, not
+durable. Blockchains answer this by replicating everything on every
+full node, paid through issuance or fees; AIWA declines the globally
+replicated state (§1), so durability is left to whoever chooses to hold
+the data. §13.1's last paragraph covers a different case (loss of one
+device, key restored elsewhere), and says plainly that hardware does not
+substitute for reachability during a partition.
+
+**Stated as open, not solved:** who runs keepers and why (an incentive
+is not specified — value accrual (§7) is local and unconditional, it
+pays nobody to store); how keepers choose what to keep; and whether a
+keeper that holds an event is also a useful Mirror observer of it (it
+would give a stable, always-available reference, at the price of
+pulling the protocol toward the infrastructure it is built to avoid).
+`aiwa-platform` has no rendezvous of its own: the first connection
+between two peers is a manual offer/answer exchange (AIWA_chain's
+`sync-protocol.js` also has a Nostr-relay-assisted path). A consequence
+seen in practice: a contract published from one device can be loaded by
+someone else only while a copy of its events is reachable — a hosted
+export, or a keeper.
+
+### 13.3 Triangulation, without weights — prototype, compared
+
+Observations in Mirror are **references, not opinions**: each resolves
+to a real event that only X could have produced. That suggests a rule
+with no weight: the highest epoch of X that any observer provably
+received is a *lower bound* (one honest observer establishes it; no
+number of observers who saw less can lower it; nobody but X can raise
+it), a report by X below that bound contradicts X's own signed history,
+and two events of X held by observers, neither an ancestor of the other,
+are a provable *fork*. Implemented as `aiwa-core`'s
+`src/triangulation.js` — **not part of the protocol, not exported, not
+wired into `computeCausalTick`** — and compared with the weighted
+median (§13) in `experiments/triangulation-scenarios.mjs`, on synthetic
+worlds that model the threats considered (fixtures, not a proof):
+
+| World | Weighted median (§13) | Triangulation |
+|---|---|---|
+| Honest | 100 | lower bound 100 |
+| Funded majority saw only an old state (10); one honest saw 100 | **10**; the consistency check accuses the honest domain | 100 |
+| Unfunded observers saw an old state | 100 (weight ignores them) | 100 |
+| X rewinds to 50; funded majority saw 50; one honest saw 100 | 50; "consistent" | **contradicted**, witnessed by the event at 100 |
+| X holds two unrelated histories at 100 | 100; no notion of a fork | **fork** reported |
+| Observer cites an event that does not exist | 100 | 100 (reference resolves to nothing) |
+| Only stale observers; X progressed offline to 100 | 10; accused as inconsistent | lower bound 10, *ahead by 90*, not accused |
+| **A forged event of X (epoch 999999) got into the log** | 100 — weight resists | **999999 — fooled**, and it would accuse the honest domain |
+
+What this shows, and what it does not. The weighted median is a vote:
+enough weight on an old view moves it, and "far from the median" cannot
+tell inflation from legitimate offline progress. The triangulation is a
+set of proofs, so it is immune to observers who saw less, and it yields
+forks and rewinds that a vote cannot. It is **only as good as the check
+that admits events attributed to X into the log** (signature and
+sequential proof, §5–§6): where that check has a hole, the lower bound is
+fooled while the weight is not. It gives no upper bound, it is only as
+fresh as the freshest honest observer (a keeper, §13.2, would help), and
+it says nothing about whether observers are distinct actors — the count
+of observers is informational, exactly like §13.1's hardware count.
+Independence is still the open question; this file removes the weight,
+not that assumption.
 
 ## 14. Relative rate, without a clock
 
