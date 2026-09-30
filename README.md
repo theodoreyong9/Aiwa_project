@@ -300,8 +300,13 @@ cached, and a later offline visit is served from it.
   real `aiwa-core`: pinned ids and no contract code in the sphere; YourMine's own `extractSphereField` reads
   its name/icon/category/description; verified run from a public export and from this device (popup, then kept
   by hash without a window); tampered export, other manifest and a contract this device never published are
-  refused; the provider opened by hand gives nothing. Not checked: inside the YourMine app itself (its CSP on
-  blob modules), on a phone, and anyone *else* getting the contract without a public export (there is no
+  refused; the provider opened by hand gives nothing; the post-publish panel at a phone's width (Pixel 7
+  emulation) — which showed the long address/manifest line widening the whole page, now wrapped. Read in
+  YourMine's source rather than run on its site (unreachable from here): its runtime already loads sphere code
+  through `blob:` script URLs and `import()`s from https, its repository carries no CSP, no import map, and
+  its submission validator checks file type, ownership, hash and signature, not the code — so nothing in the
+  sphere is of a kind it refuses. `raw.githubusercontent.com` answers with `access-control-allow-origin: *`,
+  so a raw GitHub address works as the public export. Not checked: inside the YourMine app itself, on a phone, and anyone *else* getting the contract without a public export (there is no
   automatic first-peer rendezvous yet in `aiwa-platform`).
 
   A published contract isn't limited to single, one-shot transfers —
