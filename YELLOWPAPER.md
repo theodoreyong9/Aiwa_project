@@ -367,8 +367,11 @@ confirmed**: $\lceil b_{\text{total}} \cdot 10^9 \rceil \le \text{covered}(D)$ l
   records gives different — each correct — results. A reader that cannot reach Solana confirms nothing, so credits
   no one's commitment until it can; folding again after confirming turns a rejected `accrual` into an accepted one.
   This is §8's "one exception to the no-shared-infrastructure principle", not a new one. It has a consequence worth
-  stating: to *receive* value from $D$, a reader must have confirmed $D$'s burn, since $D$'s claims exist only
-  through its position.
+  stating, and it concerns *minting*, not transfer: a claim exists in a reader's view only if the domain that minted
+  it has a position there, hence a burn the reader confirmed. Moving a claim from hand to hand looks at nothing but
+  the claim, so a holder who never burned anything (a relay, a winner paid by a contract, a recipient) passes value
+  on freely; what a receiver needs is the burn of the coin's *origin*, which travels with the coin's ancestors
+  and is confirmed once.
 - The certified witness weight of §13 is the same quantity: $w_i$ = the lamports the reader confirmed for $i$.
 - Opt-out is explicit — `commitmentBacking: 'none'` in the deployment's parameters — for tests, demos and private
   economies; omitting it means mandatory.
