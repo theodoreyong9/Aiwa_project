@@ -1244,6 +1244,61 @@ $('btn-scan-voucher').addEventListener('click', async () => {
   if (!ok) $('voucher-redeem-result').textContent = 'Camera QR scanning is not supported in this browser — paste the code instead.';
 });
 
+// ---------- hand-off from the Aiwa Android app ----------
+// The Aiwa app (github.com/theodoreyong9/Aiwa_widget) has Claude write a contract — one
+// self-contained index.html — and opens this page at  #publish=1;<name>;<code>  where <code> is the
+// file, raw-deflated then base64url-encoded. A URL fragment never leaves the browser: no server sees it.
+// The "Publish as yourself" form (Actions → Smart contract) is then filled in — and NOTHING is
+// published: reading the code and pressing Publish, which signs with your identity, stay yours.
+// Not connected yet: the Wallet tab stays in front, says so, and the form is filled the moment you connect.
+(function aiwaHandoff() {
+  const match = /^#publish=1;([A-Za-z0-9_.-]{1,60});([A-Za-z0-9_-]+)$/.exec(location.hash);
+  if (!match) return;
+  try { history.replaceState(null, '', location.pathname + location.search); } catch (err) { /* cosmetic */ }
+  const MAX_CHARS = 1000000;
+  const note = document.createElement('p');
+  note.className = 'muted';
+  note.id = 'handoff-note';
+  document.querySelector('.app-header')?.append(note);
+
+  async function unpack(b64url) {
+    if (typeof DecompressionStream !== 'function') throw new Error('this browser cannot unpack it (DecompressionStream)');
+    const bytes = Uint8Array.from(atob(b64url.replace(/-/g, '+').replace(/_/g, '/')), (c) => c.charCodeAt(0));
+    let text;
+    try {
+      text = await new Response(new Blob([bytes]).stream().pipeThrough(new DecompressionStream('deflate-raw'))).text();
+    } catch (err) {
+      throw new Error('the data is damaged');
+    }
+    if (text.length > MAX_CHARS) throw new Error('it is too big');
+    return text;
+  }
+
+  (async () => {
+    let code;
+    try {
+      code = await unpack(match[2]);
+    } catch (err) {
+      note.textContent = `Contract received from Aiwa, but not opened: ${err.message}.`;
+      return;
+    }
+    const name = match[1];
+    note.textContent = `Contract « ${name} » received from Aiwa — connect your wallet (Connect, below): it will be waiting in Actions → Smart contract → Publish as yourself.`;
+    const started = Date.now();
+    const wait = setInterval(() => {
+      if (Date.now() - started > 30 * 60 * 1000) { clearInterval(wait); return; }
+      if ($('publish-identity').hidden) return; // not connected yet
+      clearInterval(wait);
+      $('contract-name').value = name;
+      $('contract-version').value = '1.0.0';
+      $('contract-code').value = code;
+      switchView('actions');
+      $('contract-code').scrollIntoView({ block: 'center' });
+      note.textContent = `Contract « ${name} » from Aiwa is in Actions → Smart contract → Publish as yourself: read it, then press Publish.`;
+    }, 400);
+  })();
+})();
+
 updateGates();
 
 if ('serviceWorker' in navigator) {

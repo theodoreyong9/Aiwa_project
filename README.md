@@ -270,6 +270,16 @@ cached, and a later offline visit is served from it.
   `defineContract`/`Contract`/`signedAction` SDK) generates its own,
   separate identity the instant it opens — it can never see yours.
 
+  **Opening the form pre-filled from the Aiwa Android app (`#publish=1;<name>;<code>`).**
+  [Aiwa](https://github.com/theodoreyong9/Aiwa_widget) has Claude write a contract — one
+  self-contained `index.html` — and opens this page with the file in the URL *fragment*
+  (raw-deflated, then base64url-encoded; a fragment is never sent to a server). Once your wallet
+  is connected, *Actions → Smart contract → Publish as yourself* holds the name, version `1.0.0` and
+  the code — and nothing more: reading it and pressing **Publish** (which signs with your identity)
+  stay yours. Not connected yet, the Wallet tab stays in front with a note, and the form is filled the
+  moment you connect. Anything not matching that exact shape is ignored. Checked in Chromium on this
+  very page (real connect, real form; 6.7 KB contract byte for byte; garbage and foreign fragments ignored).
+
   A published contract isn't limited to single, one-shot transfers —
   [`examples/channel-contract.html`](examples/channel-contract.html)
   is a real, standalone demo of a contract that opens its own real
