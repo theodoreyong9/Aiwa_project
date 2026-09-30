@@ -627,6 +627,9 @@ $('btn-connect').addEventListener('click', async () => {
     aiwa = new AIWA({ rewardParams: REWARD_PARAMS, dbName: 'aiwa-project-wallet' });
     const mnemonic = $('mnemonic').value.trim();
     await aiwa.connect(mnemonic ? { mnemonic } : {});
+    // Without a connection the page still works (burn() below is given its own); with one, burns that arrive with other
+    // domains' events are confirmed by themselves. Never blocks connecting: offline, this just stays unset.
+    solanaConnection().then((connection) => { if (aiwa) aiwa.connection = connection; }).catch(() => { solanaConnectionPromise = null; });
     $('connect-form').hidden = true;
     $('connected-info').hidden = false;
     updateGates();
@@ -786,6 +789,14 @@ $('btn-peer-scan-offer').addEventListener('click', async () => {
 });
 
 const SOLANA_DEVNET_RPC = 'https://api.devnet.solana.com';
+
+// One Solana connection, made on first use. The wallet needs it to confirm burns (aiwa-lib: a commitment counts
+// only as far as burns the wallet confirmed cover it — its own, and every other domain's it is asked to credit).
+let solanaConnectionPromise = null;
+function solanaConnection() {
+  solanaConnectionPromise ??= import('https://esm.sh/@solana/web3.js@1.98.0').then((web3) => new web3.Connection(SOLANA_DEVNET_RPC, 'confirmed'));
+  return solanaConnectionPromise;
+}
 
 $('btn-refresh-sol').addEventListener('click', async () => {
   try {

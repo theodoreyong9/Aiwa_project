@@ -348,6 +348,33 @@ the one exception to this document's own no-shared-infrastructure
 principle. Once activated, $\mathrm{epoch}_D$ requires no further
 contact with Solana or Earth.
 
+### 8.2 The commitment is backed in the reducer — mandatory
+
+Until this revision the reducers did not enforce §8: an `accrual` event carrying any `b`, signed by its domain, was
+accepted, and since $R$ is linear in $b$ a domain could commit $b = 10^9$ with no burn anywhere and accrue on it
+(measured on `aiwa-lib`: five epochs, 5 087 221 claimable). The burn was a convention of the application.
+
+Now `applyAccrualEvent` rejects an `accrual` unless the domain's total $b$ is **covered by burns the reader
+confirmed**: $\lceil b_{\text{total}} \cdot 10^9 \rceil \le \text{covered}(D)$ lamports.
+
+- A domain points at a burn with a `burn-record` event — `{ domain, signature }`, the Solana signature and nothing
+  else. The reducer does not read what the burn was worth from the event, and never reaches Solana: it reads the
+  record **the reader fetched itself** (`fetchBurnRecord`: the FINALIZED transaction), and counts the burn for $D$
+  only if that record is error-free, positive, sent to the incinerator, **paid by $D$'s own key** (a domain id is
+  the hash of the key that is also its Solana address) and really spent by that payer. One signature counts once.
+  Quoting someone else's signature earns nothing.
+- Deterministic *per reader*, like the rest of validity (§11): the same log folded with different confirmed
+  records gives different — each correct — results. A reader that cannot reach Solana confirms nothing, so credits
+  no one's commitment until it can; folding again after confirming turns a rejected `accrual` into an accepted one.
+  This is §8's "one exception to the no-shared-infrastructure principle", not a new one. It has a consequence worth
+  stating: to *receive* value from $D$, a reader must have confirmed $D$'s burn, since $D$'s claims exist only
+  through its position.
+- The certified witness weight of §13 is the same quantity: $w_i$ = the lamports the reader confirmed for $i$.
+- Opt-out is explicit — `commitmentBacking: 'none'` in the deployment's parameters — for tests, demos and private
+  economies; omitting it means mandatory.
+- **Not covered.** A dishonest Solana endpoint is the reader's problem. Logs written before this rule, without
+  burns, are rejected by a reader who enforces it.
+
 ## 9. Conservation
 
 A claim is a tuple $(\mathrm{id}, \mathrm{amount}, \mathrm{owner},

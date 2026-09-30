@@ -157,6 +157,13 @@ cached, and a later offline visit is served from it.
   on-chain call through a real `@solana/web3.js` `Connection` (RPC
   endpoint configurable, defaults to devnet) — burn sends real lamports
   to Solana's own real incinerator address, real and irreversible.
+  **The burn is what backs your capital — mandatory** (yellow paper §8.2): after broadcasting, the wallet asks Solana
+  for the *finalized* transaction, checks that it is a burn paid by your own key, publishes it (the signature only)
+  and only then commits the capital; committing without a burn is refused. To credit **another** domain's capital
+  (and so to receive value from it) the wallet must have confirmed that domain's burn against Solana too: the page
+  gives the wallet its Solana connection once it is connected, and confirmation then happens by itself when events
+  arrive. Offline, nothing else's capital is credited until a connection exists. Not exercised against a real Solana
+  endpoint from the build environment (see below).
 - **AIWA balance, claimable, claim**: "Spendable now" is the real sum
   of your own already-claimed, active claims — what `Send` can
   actually move. "Claimable" is real, accrued-but-not-yet-claimed value
