@@ -585,45 +585,65 @@ seen in practice: a contract published from one device can be loaded by
 someone else only while a copy of its events is reachable — a hosted
 export, or a keeper.
 
-### 13.3 Triangulation, without weights — prototype, compared
+### 13.3 Proofs and the weighted median, combined — experimental
 
 Observations in Mirror are **references, not opinions**: each resolves
-to a real event that only X could have produced. That suggests a rule
-with no weight: the highest epoch of X that any observer provably
-received is a *lower bound* (one honest observer establishes it; no
-number of observers who saw less can lower it; nobody but X can raise
-it), a report by X below that bound contradicts X's own signed history,
-and two events of X held by observers, neither an ancestor of the other,
-are a provable *fork*. Implemented as `aiwa-core`'s
-`src/triangulation.js` — **not part of the protocol, not exported, not
-wired into `computeCausalTick`** — and compared with the weighted
-median (§13) in `experiments/triangulation-scenarios.mjs`, on synthetic
-worlds that model the threats considered (fixtures, not a proof):
+to the progression event that fixes its epoch, an event only X's key can
+sign. So an observation is also a *proof*. From proofs alone: the
+highest epoch of X that any observer provably received is a *lower
+bound* (one honest observer establishes it; no number of observers who
+saw less can lower it; nobody but X can raise it); a report by X below
+that bound contradicts X's own signed history (a *rewind*); and two
+progression events of X held by observers, neither an ancestor of the
+other, are a provable *fork*. The weighted median above remains the
+estimate. `aiwa-core` combines the two (`src/triangulation.js`,
+`src/position.js`, `assessPosition`) — **experimental, exported, and not
+wired into `computeCausalTick`, which is unchanged**:
 
-| World | Weighted median (§13) | Triangulation |
-|---|---|---|
-| Honest | 100 | lower bound 100 |
-| Funded majority saw only an old state (10); one honest saw 100 | **10**; the consistency check accuses the honest domain | 100 |
-| Unfunded observers saw an old state | 100 (weight ignores them) | 100 |
-| X rewinds to 50; funded majority saw 50; one honest saw 100 | 50; "consistent" | **contradicted**, witnessed by the event at 100 |
-| X holds two unrelated histories at 100 | 100; no notion of a fork | **fork** reported |
-| Observer cites an event that does not exist | 100 | 100 (reference resolves to nothing) |
-| Only stale observers; X progressed offline to 100 | 10; accused as inconsistent | lower bound 10, *ahead by 90*, not accused |
-| **A forged event of X (epoch 999999) got into the log** | 100 — weight resists | **999999 — fooled**, and it would accuse the honest domain |
+- **position** = max(weighted median, proven lower bound): the vote is
+  never reported below what is proven, and with no funded observer the
+  proven bound stands alone.
+- **accusation** (rewind or fork) comes from **proofs only**; the median
+  never accuses, because "far from the median" cannot tell inflation
+  from legitimate offline progress.
+- Both rules see the same events: every progression event of the target
+  that fails an authenticity check (by default the signature of §5:
+  signed by the key whose id is the domain) is removed first and
+  reported, so a forged event cannot move either.
+
+Compared in `experiments/triangulation-scenarios.mjs`, on synthetic
+worlds that model the threats considered (the target's events and the
+observers' commitments are really signed; the worlds are chosen by
+their author, so this is a comparison, not a proof):
+
+| World | Weighted median (§13) | Proofs alone, log trusted | **Combined** |
+|---|---|---|---|
+| Honest | 100 | 100 | 100 |
+| Funded majority saw only an old state (10); one honest saw 100 | **10**; its check accuses the honest domain | 100 | **100** |
+| Unfunded observers saw an old state | 100 | 100 | 100 |
+| *Only* unfunded observers, all saw 100 | no tick | 100 | **100** |
+| X rewinds to 50; funded majority saw 50; one honest saw 100 | 50; "consistent" | contradicted | **100, accused (rewind)** |
+| X holds two unrelated histories at 100 | 100; no notion of a fork | fork | **100, accused (fork)** |
+| Observer cites an event that does not exist | 100 | 100 | 100 |
+| Only stale observers; X progressed offline to 100 | 10; accused | 10 | 10, *ahead by 90*, not accused |
+| A forged event of X (signed by someone else) in the log; funded **minority** cites it | 100 | **999999** | **100** |
+| The same, funded **majority** cites it | **999999**; accuses the honest domain | **999999** | **100** |
+| **X signs a fake far-ahead event itself, no sequential work; funded majority cites it** | **999999** | **999999** | **999999** |
 
 What this shows, and what it does not. The weighted median is a vote:
-enough weight on an old view moves it, and "far from the median" cannot
-tell inflation from legitimate offline progress. The triangulation is a
-set of proofs, so it is immune to observers who saw less, and it yields
-forks and rewinds that a vote cannot. It is **only as good as the check
-that admits events attributed to X into the log** (signature and
-sequential proof, §5–§6): where that check has a hole, the lower bound is
-fooled while the weight is not. It gives no upper bound, it is only as
-fresh as the freshest honest observer (a keeper, §13.2, would help), and
-it says nothing about whether observers are distinct actors — the count
-of observers is informational, exactly like §13.1's hardware count.
-Independence is still the open question; this file removes the weight,
-not that assumption.
+enough weight on an old view moves it. Proofs are immune to observers who
+saw less, and yield rewinds and forks a vote cannot; the authenticity
+check is what stops them from being moved by a forged event, and stops a
+funded majority from moving the estimate with one. The last row is not
+covered: the signature is genuine, so a signature-only check accepts it.
+The sequential (VDF) proof is what rejects it at admission (§6); a
+caller who wants that check here passes a stricter `isAuthentic`. Other
+limits stand: no upper bound (being ahead is reported, not accused); only
+as fresh as the freshest honest observer (a keeper, §13.2, would help);
+and nothing about whether observers are distinct actors — the count of
+observers is informational, exactly like §13.1's hardware count.
+Independence is still the open question; this removes the weight from
+the accusations, not that assumption.
 
 ## 14. Relative rate, without a clock
 
