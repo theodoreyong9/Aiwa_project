@@ -1,17 +1,12 @@
 # AIWA_project
 
-A real wallet interface for AIWA — connect, balance, burn, claim,
-send/receive (including fully offline via QR/Share), and a real
-delegated "sign once, click as many times as you want" channel. A
-single static page (`index.html`), no build step, no server: it opens
-directly against [`aiwa-lib`](https://github.com/theodoreyong9/Aiwa_lib),
-which composes [`aiwa-core`](https://github.com/theodoreyong9/Aiwa_core)
-(validation) and [`aiwa-platform`](https://github.com/theodoreyong9/Aiwa_platform)
-(distributed infra). This document describes what the page actually
-does today — not a changelog, not a roadmap. For the formal protocol
-specification — identity, the event log, progression, accrual,
-conservation, delegation, bearer vouchers, and everything else that
-lives in `aiwa-core` rather than in this page — see
+The AIWA wallet page: connect, burn, claim, send, receive (QR), contracts, browse. A single static page
+(`index.html`), no build step, no server: it opens directly against
+[`aiwa-lib`](https://github.com/theodoreyong9/Aiwa_lib), which composes
+[`aiwa-core`](https://github.com/theodoreyong9/Aiwa_core) (validation) and
+[`aiwa-platform`](https://github.com/theodoreyong9/Aiwa_platform) (distributed infra). This document describes what
+the page does today, not a changelog. For the formal protocol — identity, the event log, progression, accrual,
+conservation, and everything else that lives in `aiwa-core` rather than in this page — see
 [`YELLOWPAPER.md`](./YELLOWPAPER.md).
 
 ## Where this sits
@@ -61,68 +56,18 @@ then open `http://127.0.0.1:8080/index.html`.
 
 ## Interface: three tabs, installable
 
-The page is organized into three tabs (`Wallet`, `Actions`, `Browse`)
-behind a responsive nav — icon+label side by side on wider screens,
-icon-above-label once the viewport gets narrow enough that the two
-wouldn't both fit.
+- **Wallet** — Connect; then the balance (spendable, claimable, **Claim**), your identity id and Solana address
+  (Copy), **Burn**, **Send**, **Receive**, and History (read from the event log, never a separate ledger).
+- **Contract** — publish a contract, then the pinned YourMine sphere.
+- **Browse** — open a contract by address, or list what an identity published.
 
-**`Wallet` is purely about identity and connectivity** — Connect,
-"Real peer connections" (the actual `createOfferFor`/`acceptOffer`/
-`completeConnection` primitives, see above), and "Open a channel" (the
-real request/accept/confirm handshake, see above). Nothing here moves
-value or publishes anything; it only ever gets you connected, one way
-or another.
+Dark and light follow the system; a phone width is a single column, with no sideways scroll.
 
-**`Actions` is one place for the five things a wallet actually does —
-Payment, Session payment, QR cash-out, Mining, Smart contract — and
-each behaves the same whether you're connected to the network, have a
-confirmed channel open, or both.** This replaced an earlier design
-where a channel's capabilities lived in their own separate tab,
-duplicating Send/Withdraw/Publish under different names — the real
-complaint that shipped this rewrite: two different-looking flows for
-the same kind of action, depending on which tab you happened to be in.
-Now each section shows whichever half of it actually applies:
-
-- **Payment** — Send AIWA (network or a fully offline QR bundle) and
-  Receive, using your root key. Gated on being connected.
-- **Session payment** — the channel's own Send/Claim/Receive, using
-  its already-unlocked session key. Gated on having a real, CONFIRMED
-  channel (see `Wallet`'s handshake above) — a hint tells you to open
-  one first if you don't have one yet.
-- **QR cash-out** — issue/redeem a real bearer voucher, "From your
-  identity" (root key) and/or "From your channel" (session key),
-  whichever applies, shown side by side rather than on separate tabs.
-- **Mining** — the real Solana burn (ignites your AIWA capital) plus
-  claimable/spendable/claim. Gated on being connected, same as Payment.
-- **Smart contract** — publish, "as yourself" (root identity) and/or
-  "via your channel" (the channel's own session identity — see
-  `aiwa-lib`'s own README for the honest limit this carries:
-  discoverable by address, but not via "list by creator" for your root
-  id, since the real cryptographic author is the channel's session
-  identity here).
-
-**A confirmed channel is a real, standalone wallet** — none of its
-Actions-tab sections need a root connection at all once confirmed,
-exactly mirroring `aiwa-lib`'s own `Channel` API. Verified live,
-through this exact UI, fully disconnected: session-payment send,
-claim, receive, issue+redeem a voucher, and publish (and have it show
-up in `Browse`) all keep working with no root identity connected — the
-UI itself reflects this directly: disconnecting hides everything
-gated on the root key while everything gated on the channel stays
-exactly where it was.
-
-**`Browse`** is unchanged in substance (look up a contract by address,
-or list everything a given identity has published) — just its own tab
-now that publishing itself lives in `Actions`.
-
-**History** is not a separate ledger kept alongside the wallet — it's
-read directly from the real event log (`aiwa.log.since([])`) on every
-view, filtered to the events that actually belong to the connected
-identity (commitments, claims, transfers in and out, channel sends,
-voucher redemptions) and resolved against the real, materialized
-conservation state for each one's actual amount, never a value stored
-redundantly. There is no separate source of truth to drift from what
-the wallet itself already computes.
+**What the page leaves out, on purpose.** Live peer connections (WebRTC offer/answer), channels (delegated session
+keys), bearer withdrawal QR codes (vouchers) and a separate "offline bundle" feature are not in this page. They stay in
+`aiwa-lib` / `aiwa-platform`, which expose them to any other front end. Consequences: there is no "send over the
+network" and no automatic sync with a peer — **Send and Receive are one QR (or copy/paste, or share sheet)** — and
+Browse sees what is in *this device's* log: what you published, and what you received.
 
 It's also a real PWA: `manifest.webmanifest` + `sw.js` make it
 installable (a real "Add to Home Screen" / install prompt, standalone
@@ -145,13 +90,11 @@ cached, and a later offline visit is served from it.
 
 ## What's real here
 
-- **Connect / disconnect**: derives or generates a real Ed25519
-  keypair — from a real BIP39 mnemonic, or freshly generated if none is
-  given — that serves as BOTH your real Solana address and your AIWA
-  identity (same curve). Disconnecting clears it from memory only;
-  your own already-synced local data (in a real, persistent IndexedDB
-  database) is untouched and reloads the moment you reconnect with the
-  same key.
+- **Connect / disconnect**: derives or generates a real Ed25519 keypair — from a BIP39 recovery phrase, or freshly
+  generated if none is given — that serves as BOTH your Solana address and your AIWA identity (same curve).
+  Disconnecting clears it from memory only; your local data (a persistent IndexedDB database) reloads the moment you
+  reconnect with the same key.
+
 - **Address / Solana balance / Burn**: the real address is always
   shown once connected. Solana balance and burn both make a real
   on-chain call through a real `@solana/web3.js` `Connection` (RPC
@@ -166,46 +109,12 @@ cached, and a later offline visit is served from it.
   as the wallet has confirmed the burn of the domain that minted it. Offline, no newly minted value is credited
   until a connection exists; value already in the wallet is untouched. Not exercised against a real Solana
   endpoint from the build environment (see below).
-- **AIWA balance, claimable, claim**: "Spendable now" is the real sum
-  of your own already-claimed, active claims — what `Send` can
-  actually move. "Claimable" is real, accrued-but-not-yet-claimed value
-  from `aiwa-core`'s own progression/reward mechanism, growing only as
-  real VDF proofs are computed (the "Start progress loop" button — real
-  computation, not simulated, ticking every 30 real seconds while the
-  page is open). "Claim" moves claimable into a real, spendable claim
-  with one real signature.
-- **Send AIWA**: real, signed transfers, either broadcast to a real,
-  live P2P session ("Enable networking", using `aiwa-platform`'s real
-  `WebrtcTransport`) or generated as a fully offline bundle — real
-  signed events plus every real ancestor event a stranger with zero
-  prior sync would need, encoded as a compact string. "Max" fills in
-  exactly what's genuinely spendable, never the inflated total that
-  also includes not-yet-claimed value (see aiwa-lib's own README for
-  the real bug this distinction fixed). **The live-network path had two
-  real bugs** (`aiwa-lib`'s own `send()` never actually published new
-  events to an already-connected peer, and even after that fix, never
-  bundled the full ancestor chain a peer without prior sync needed) —
-  found and fixed in `aiwa-lib`, then re-verified directly against
-  THIS page's own "Enable networking"/"Send over the network" buttons:
-  two real, separate browser contexts, real WebRTC, peers connected
-  before any funding or sending happened (the exact ordering that was
-  silently broken before), a real send through the actual UI button,
-  and the recipient's own real balance updating correctly.
-- **Real peer connections**: there is no shared "network" to join —
-  `WebrtcTransport.connect()` is a literal no-op, since this transport
-  has no relay or room concept at all. "Enable networking" only readies
-  a real transport + replicator; every actual connection is made one
-  peer at a time via a real offer/answer exchange, exposed directly in
-  the UI (Wallet tab, "Real peer connections"): **Connect to a peer**
-  creates a real offer (`WebrtcTransport.createOfferFor`) to send your
-  peer any way you like (QR, copy/paste, a share sheet), then completes
-  the connection once you paste their real answer back
-  (`completeConnection`); **Accept an incoming connection** does the
-  reverse (`acceptOffer`) for whoever received your offer. Verified live
-  via Playwright: two real, separate browser contexts exchange a real
-  offer and answer entirely through the UI's own Share/Copy buttons (no
-  test-only backdoor), and each ends up with the other in its real
-  connected-peers list.
+
+- **Balance, claimable, claim**: "Spendable" is the sum of your own already-claimed, active claims — what Send can
+  move. "Claimable" is accrued-but-not-yet-claimed value from `aiwa-core`'s progression and reward mechanism, growing
+  as real VDF proofs are computed (the progress loop starts by itself when you connect). **Claim** moves claimable
+  into a spendable claim with one signature.
+
 - **Catching up since last checkpoint**: connecting shows a real
   progress bar while a genuinely large backlog since your last local
   checkpoint is folded (`aiwa.onMaterializeProgress`, wired straight
@@ -217,49 +126,14 @@ cached, and a later offline visit is served from it.
   now also runs automatically once connected, so that backlog stays
   bounded going forward instead of growing indefinitely between
   checkpoints.
-- **Receive**: pastes or scans (via the browser's native
-  `BarcodeDetector`, where supported) a real offline bundle and appends
-  it — real signature and causal verification, identical to any other
-  real append; a forged or tampered bundle is rejected, not silently
-  accepted.
-- **Withdraw — a real bearer QR**: a genuinely different primitive from
-  Send/Receive — the recipient is unknown until redemption time.
-  Generates a real hash-locked withdrawal code (`aiwa-lib`'s own
-  `issueVoucher`/`redeemVoucher`); whoever scans or pastes it first
-  genuinely gets the value. The code can be freely copied, screenshot,
-  forwarded — only the first real redemption succeeds, an honest
-  property of `aiwa-core`'s own single-writer conservation model, not
-  new double-spend logic. Same "detection via reconciliation" honest
-  limit as any offline send: two people can each locally believe they
-  redeemed it until their logs sync.
-- **Channel — a real handshake, works fully offline**: a channel needs
-  your peer's real consent, not just a click on your own side.
-  **Request channel** issues a real, one-time delegation from your root
-  key and hands you a small, portable blob to send your peer any way
-  you like — QR, copy/paste, a share sheet, even fully disconnected
-  from any network (Bluetooth, AirDrop, anything that can carry text).
-  **Accept an incoming channel request** lets your peer verify that
-  delegation is real and sign their own real consent back, entirely
-  offline and without touching their own log. Pasting that accept back
-  into **Confirm** — itself a pure offline check, no root key or
-  network needed — is what actually makes the channel usable: three
-  concrete checks close the gap the old, unilateral single-click
-  `openChannel()` (still available as an `aiwa-lib` API, and still used
-  standalone by [`examples/channel-contract.html`](examples/channel-contract.html))
-  left open — an accept must be for THIS exact request, must really be
-  signed by whoever it claims, and must really come from the peer this
-  channel was opened for, not any third party who merely saw the
-  request blob. Once confirmed, every click afterward signs with an
-  already-unlocked, real, deterministic session key alone — recoverable
-  even after a crash, since it's derived from your own root key plus
-  the peer's id, never randomly generated. Genuinely self-sufficient
-  once open: clicking **Disconnect** does not stop it — a click that
-  needs splitting a claim into the exact amount still works, real
-  delegated split and all, with no root key involved for any amount.
-  Verified live via Playwright: two real, separate browser contexts
-  exchange a real request and accept entirely through the UI's own
-  Share/Copy buttons, and the requester's channel becomes usable only
-  after the real accept comes back.
+
+- **Send / Receive**: a signed transfer plus every ancestor event a stranger with no prior sync needs, encoded as a
+  compact string — shown as a QR, or copied, or shared. Receive scans it (the browser's `BarcodeDetector`, where
+  supported) or takes it pasted, and appends it with the same signature and causal verification as any other append; a
+  forged or tampered code is rejected, not silently accepted. Send moves what is *spendable*, never the total that
+  includes not-yet-claimed value. A QR that cannot be drawn is not fatal: the send is already final, Share and Copy
+  stay.
+
 - **Publish a contract / Browse contracts**: publishes a real, signed,
   addressable bundle via `aiwa-platform`'s own real `publishBundle` —
   real content-addressed dedup, real version history, a real fork
@@ -283,7 +157,7 @@ cached, and a later offline visit is served from it.
   [Aiwa](https://github.com/theodoreyong9/Aiwa_widget) has Claude write a contract — one
   self-contained `index.html` — and opens this page with the file in the URL *fragment*
   (raw-deflated, then base64url-encoded; a fragment is never sent to a server). Once your wallet
-  is connected, *Actions → Smart contract → Publish as yourself* holds the name, version `1.0.0` and
+  is connected, the *Contract* tab holds the name, version `1.0.0` and
   the code — and nothing more: reading it and pressing **Publish** (which signs with your identity)
   stay yours. Not connected yet, the Wallet tab stays in front with a note, and the form is filled the
   moment you connect. Anything not matching that exact shape is ignored. Checked in Chromium on this
@@ -318,16 +192,10 @@ cached, and a later offline visit is served from it.
   so a raw GitHub address works as the public export. Not checked: inside the YourMine app itself, on a phone, and anyone *else* getting the contract without a public export (there is no
   automatic first-peer rendezvous yet in `aiwa-platform`).
 
-  A published contract isn't limited to single, one-shot transfers —
-  [`examples/channel-contract.html`](examples/channel-contract.html)
-  is a real, standalone demo of a contract that opens its own real
-  delegated `Channel` (see above) over its own, independent
-  `WebrtcTransport`, entirely separate from whatever wallet published
-  or opened it: two of its own identities, a real signaling exchange,
-  a real `openChannel()`, and repeated real `channel.send()` clicks —
-  no simulation. Verified live via Playwright: a real WebRTC data
-  channel opens, funding happens, the channel opens, and each click
-  moves real value with the recipient's balance updating correctly.
+  [`examples/channel-contract.html`](examples/channel-contract.html) is a standalone example of a contract that is
+  more than a one-shot transfer: it opens its own `aiwa-lib` `Channel` over its own `WebrtcTransport`, entirely
+  separate from whatever wallet published or opened it. It is a contract, not a feature of this page, and the example
+  Aiwa's Claude is told to read.
 
 ## What isn't verified here, and why
 
@@ -363,19 +231,10 @@ library. Two concrete, honest consequences:
   `sandbox="allow-scripts"` and no `allow-same-origin` — a real,
   opaque, isolated origin, checked directly rather than assumed.
 
-Everything else described above — connect/disconnect, claim, send/receive
-(network and offline), and the channel's full set of capabilities
-(send, claim, receive, issue+redeem a voucher, publish a contract, all
-fully disconnected from the root identity) — was verified live, end to
-end, in
-a real Chromium browser via Playwright, including the real VDF
-progress loop actually growing claimable over real wall-clock time,
-and a real forged-bundle rejection. The tabbed navigation, History
-(rendering real commit/claim/send/receive/channel/voucher-redeem
-entries with real, resolved amounts after a real funding+send+receive
-sequence), and the PWA manifest + service worker (resolves, registers,
-and reaches an `active` state) were all verified the same way, in the
-same real browser.
+Everything else above — connect/disconnect, claim, the tabs, History, the PWA manifest and service worker, the
+contract publish/browse flow and the pinned sphere — was exercised in Chromium through the real page (a desktop and a
+phone width, light and dark), with the real `aiwa-lib`. Send/Receive were exercised for their messages (nothing to
+send, garbage refused); the full value path needs a confirmed burn, which needs real Solana.
 
 ## Real economic parameters
 
@@ -388,7 +247,7 @@ connects a real wallet to it.
 ## Where the real logic actually lives
 
 This repository is deliberately thin: a single HTML page wiring up
-`aiwa-lib`'s own real, already-tested `AIWA`/`Channel` classes to DOM
+`aiwa-lib`'s own real, already-tested `AIWA` class to DOM
 elements. Every real financial rule — the reward curve, conservation,
 double-spend detection, delegation — lives in `aiwa-core`, and every
 real distributed-systems piece — transport, replication, the offline
