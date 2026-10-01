@@ -214,6 +214,15 @@ contract publish/browse flow — was exercised in Chromium through the real page
 phone width, light and dark), with the real `aiwa-lib`. Send/Receive were exercised for their messages (nothing to
 send, garbage refused); the full value path needs a confirmed burn, which needs real Solana.
 
+## `aiwa.bundle.js` — the wallet as one file, for pages with no build step
+
+The deploy builds `aiwa.bundle.js` (esbuild, `scripts/build-bundle.mjs`, ~170 KB): `AIWA` (aiwa-lib) and, from
+aiwa-core, `reward`, `miningState`, `rankingFigure`, `commitmentPriceLamports`, `MAX_PATIENCE_RATE`, `assessMining`.
+A page that cannot carry an import map loads it with
+`await import('https://theodoreyong9.github.io/Aiwa_project/aiwa.bundle.js')` — YourMine does. Checked in Chromium on a
+page with no import map: connect, commit, two epochs with their proof, `mining()`; and `reward()` (the front-end
+estimate of the claimable) equals the wallet's own claimable to the last digit.
+
 ## Real economic parameters
 
 `REWARD_PARAMS` in `index.html` (`{alpha, beta, gamma, C, minQ}`) is

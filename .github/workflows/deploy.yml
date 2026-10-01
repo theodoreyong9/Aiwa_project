@@ -34,6 +34,7 @@ jobs:
           cp -r icons _site/icons
           cp -r examples _site/examples
           cp -r node_modules _site/node_modules
+          node scripts/build-bundle.mjs _site/aiwa.bundle.js
       - name: Every local file the pages refer to is in the site
         run: node scripts/check-site.mjs _site
       - uses: actions/configure-pages@v5

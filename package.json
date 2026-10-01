@@ -7,5 +7,8 @@
   "license": "MIT",
   "dependencies": {
     "aiwa-lib": "git+https://github.com/theodoreyong9/Aiwa_lib.git"
+  },
+  "devDependencies": {
+    "esbuild": "^0.25.12"
   }
 }
