@@ -198,6 +198,17 @@ carrying a real sequential proof (§6), **and signed by a real Ed25519
 key that derives $D$ itself**. Progression is local: $\mathrm{epoch}_A$
 and $\mathrm{epoch}_B$ are never directly comparable.
 
+**An epoch is a fixed amount of work (`epochIterations`).** A deployment that
+sets `rewardParams.epochIterations` $= E$ fixes the sequential work of one
+epoch, and an event may carry $k \ge 1$ epochs at once:
+$\mathrm{epoch}_D \mathrel{+}= k$, with exactly $k\cdot E$ iterations and
+one proof (§6.2). Without it the rule above holds, with an iteration count
+that is whatever the signer wrote. **That was a hole:** the reducer accepted
+any iteration count $\ge 1$, so an epoch could cost one hash and $D$'s age
+($q_{\text{total}}$, and so every ranking built on it) could be inflated for
+nothing. Time here is sequential work, not calendar time: a faster machine
+makes more epochs per second.
+
 **The signature requirement is new, and closes a real gap.** The
 sequential proof (§6) is a public, deterministic function of
 $(\mathrm{domain}, \mathrm{output}_{n-1})$ — both already visible to
@@ -264,27 +275,47 @@ Real prover cost is on the order of $2T$ modular multiplications. Real
 verifier cost is $O(\log T)$. $\ell$ is derived deterministically from
 $(x, T, y)$ — never accepted as prover-supplied input.
 
+### 6.2 Succinct progression
+
+With `epochIterations` $= E$, a progression event carries
+$(\mathrm{epoch}, \texttt{vdfIterations} = k E, y, \pi, \ell)$ and the
+reducer checks the Wesolowski proof (§6.1) instead of recomputing a hash
+chain. The work starts from $x = H(\mathrm{domain}\,\|\,\mathrm{output}_{n-1}) \bmod N$,
+so it cannot be done ahead, borrowed from another domain or reused; $y$, $\pi$
+and $\ell$ are canonical (one representation per value: $y$ and $y+N$ would
+both verify otherwise). Measured: verifying takes about 3.6 ms for $10^5$ and
+for $4\cdot 10^5$ squarings, against 0.5 s and 2.8 s to produce; the hash chain
+of §6 took 5.6 s to verify one $10^5$-step epoch. A third party — a validator, a
+registry — can therefore check a domain's age and its time since its last
+action (§7.2) at a cost of milliseconds per event, not the work the domain did.
+The cost it does pay is storage: one event per proof (about 1.7 KB), so the
+history that proves an age grows with the number of events, not of epochs
+($k$ epochs fit in one event).
+
 ## 7. Accrual — **updated**
 
 $$r(b, q, q_{\text{total}}, T) = \frac{b \cdot q^{\alpha}}{\left[\ln\left(q_{\text{total}}^{\,\beta(1-T)} + C\right)\right]^{\gamma}}$$
 
 | Symbol | Meaning |
 |---|---|
-| $b$ | committed capital (§8, cumulative) |
+| $b$ | the capital that mines: what the **last burn** committed (§7.1), $b = \mathrm{burned}\cdot(1-T)$ |
 | $q$ | epochs since $D$'s own last economic action (burn or claim); resets on each; floored at `minQ` |
 | $q_{\text{total}}$ | $D$'s own total progression epoch count; never resets |
-| $T$ | **new in this version**: a patience rate, clamped to $[0, 0.4]$ |
+| $T$ | a patience rate, clamped to $[0, 0.4]$, chosen **at the burn** for what follows (§7.1) |
 | $\alpha, \beta, \gamma, C, \mathrm{minQ}$ | deployment parameters |
 
-**This is a genuinely different formula from v2.0's own**
-$R(S,t,A) = S\cdot t^\alpha / [\beta\ln A + \ln(1+C/A^\beta)]^\gamma$ —
-not a renaming. The denominator's structure changed (a single
-$\ln(\cdot)$ term rather than a sum of two), and a patience-rate term
-$T$ was introduced with no v2.0 counterpart. Both versions share the
-same *shape* of intent — capital-weighted, epoch-driven, maturity in
-the denominator — but a deployment migrating from a v2.0-era parameter
-set must re-derive $(\alpha,\beta,\gamma,C)$ against the current
-formula; the old values do not carry over unchanged.
+**Relation to v2.0's formula.** v2.0 wrote
+$R(S,t,A) = S\cdot t^\alpha / [\beta\ln A + \ln(1+C/A^\beta)]^\gamma$. Since
+$\beta\ln A + \ln(1+C/A^\beta) = \ln(A^\beta + C)$, that is *the same
+denominator* as the one above at $T = 0$ — the single-$\ln$ form is the same
+function, written without the sum (the sum form is the numerically safe way to
+evaluate it). **The only thing that is new is $T$**, and the variables $S, t, A$
+became $b, q, q_{\text{total}}$ (capital, epochs since the last action, the
+domain's own age). An earlier revision of this paper called this "a genuinely
+different formula, not a renaming"; for the denominator that was wrong. Checked
+numerically: $R$ (v2.0), `reward()` at $T=0$ and YourMine's own `calcClaimable`
+at tax $0$ agree to the last digits, and `reward()` agrees with `calcClaimable`
+at $T = 20\%$ as well.
 
 **Reproducibility.** Computed in Q128 fixed-point BigInt arithmetic
 (`fixed-point-math.js`), never `Math.log`/`Math.pow` — IEEE 754 never
@@ -296,6 +327,45 @@ plain-`Number` convenience wrapper over it, identical in behavior.
 **Invariant, unchanged from v2.0.** $q$ and $q_{\text{total}}$ are
 derived exclusively from $D$'s own verified progression state at query
 time — never accepted from an event payload.
+
+### 7.1 "Last action" mining
+
+The position of a domain is what its **last action** left it, the same shape as
+YourMine's own mining:
+
+- **A burn's commitment replaces the position.** $b$ is the capital that now
+  mines; a small burn after a big one lowers $b$ — that is the rule.
+- **The previous position is paid first.** Before it is replaced, what it had
+  accrued is credited as a real claim (`auto:<nonce>`, owned by $D$): a new burn
+  never forfeits. (It used to: the clock was reset without paying — tested,
+  $8.5\times10^{16}$ units claimable became 0.)
+- **$T$ is chosen at the burn, not inherited.** A burn without a $T$ is
+  $T = 0$; a claim leaves $T$ as it was — it costs nothing, so it cannot buy a
+  better one.
+- **$T$ has a price, and it is destroyed, not paid to anyone**: $b =
+  \mathrm{burned}\cdot(1-T)$, so a commitment costs
+  $\lceil b/(1-T)\rceil$ lamports of confirmed burn, and each confirmed burn
+  backs commitments once (`burns.consumed`). A larger $T$ makes the curve more
+  generous ($q_{\text{total}}^{\beta(1-T)}$) and costs that share of the burn,
+  so it is a choice, not "always $0.4$". YourMine paid its tax to a fixed creator
+  address; there is no such recipient here — and a recipient chosen by the app
+  that distributes the burn would let anyone self-host a page and pay themselves,
+  making $T$ free again.
+
+### 7.2 The two states
+
+For an app, a validator or a registry holding $D$'s events (`assessMining`):
+
+1. **The mining state**: the capital that mines, $T$, the epoch of the last
+   action, the age $q_{\text{total}}$, $q$ (epochs since the last action), and
+   what is claimable now.
+2. **The ranking figure**: $\{\mathrm{score} = \text{claimable},\
+   \mathrm{laps} = \max(1, q)\}$, read at a moment and frozen by whoever stores
+   it — YourMine's score and laps.
+
+Both come from the events alone: envelopes verified, progression proofs checked
+(§6.2), the burn confirmed by the validator itself (§8.2). A validator that kept
+the state it derived earlier folds only the new events.
 
 ## 8. Genesis Commitment — **updated (atomic with the burn)**
 
@@ -337,10 +407,11 @@ candidate range to find an attacker's own real best case, rather than
 checking one interval and declaring victory. This is present, unchanged
 in purpose, in the current `aiwa-core` — a real calculator, computed per
 deployment's own chosen $(\alpha,\beta,\gamma,C)$ and cost curve, never a
-general proof that any given tuple is safe. Because §7's own formula
-changed (patience rate $T$, restructured denominator), a v2.0-era churn
-result does not carry over numerically — the calculator must be re-run
-against the current `reward()`, not assumed from the old one.
+general proof that any given tuple is safe. Because §7's rules changed
+(a patience rate $T$, and "last action" mining: a burn replaces the position
+and pays the previous one, §7.1), a v2.0-era churn result is not assumed to
+carry over — the calculator must be re-run against the current rules, not
+assumed from the old ones.
 
 **External dependency, unchanged.** Broadcasting a burn requires
 reaching a centralized, Earth-hosted RPC endpoint over real internet —
@@ -354,8 +425,9 @@ Until this revision the reducers did not enforce §8: an `accrual` event carryin
 accepted, and since $R$ is linear in $b$ a domain could commit $b = 10^9$ with no burn anywhere and accrue on it
 (measured on `aiwa-lib`: five epochs, 5 087 221 claimable). The burn was a convention of the application.
 
-Now `applyAccrualEvent` rejects an `accrual` unless the domain's total $b$ is **covered by burns the reader
-confirmed**: $\lceil b_{\text{total}} \cdot 10^9 \rceil \le \text{covered}(D)$ lamports.
+Now `applyAccrualEvent` rejects an `accrual` unless it is **covered by burns the reader confirmed** that no earlier
+commitment used: $\text{consumed}(D) + \lceil b\cdot 10^9/(1-T) \rceil \le \text{covered}(D)$ lamports (§7.1: each
+confirmed burn backs commitments once, and $T$ is paid out of the burn).
 
 - A domain points at a burn with a `burn-record` event — `{ domain, signature }`, the Solana signature and nothing
   else. The reducer does not read what the burn was worth from the event, and never reaches Solana: it reads the

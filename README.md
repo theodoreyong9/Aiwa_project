@@ -111,9 +111,17 @@ cached, and a later offline visit is served from it.
   endpoint from the build environment (see below).
 
 - **Balance, claimable, claim**: "Spendable" is the sum of your own already-claimed, active claims — what Send can
-  move. "Claimable" is accrued-but-not-yet-claimed value from `aiwa-core`'s progression and reward mechanism, growing
-  as real VDF proofs are computed (the progress loop starts by itself when you connect). **Claim** moves claimable
-  into a spendable claim with one signature.
+  move. "Claimable" is accrued-but-not-yet-claimed value, growing as epochs of real sequential work are done (the progress
+  loop starts by itself when you connect: one epoch is 100 000 modular squarings and its proof, about every 30 s, written
+  as an event of about 2 KB that anyone verifies in milliseconds — measured in Chromium on this very page). **Claim** moves
+  claimable into a spendable claim with one signature.
+- **"Last action" mining and T**: the line under the balance says what mines — the capital of your last burn, its **T**, the
+  epoch and how many epochs since your last action. **T** (0 to 40 %, next to the amount to burn) is the patience rate you
+  choose at the burn for what follows: it makes the reward curve more generous and **costs that share of the burn**, which
+  is destroyed without counting (the page says what counts as capital before you burn). A burn **replaces** your position and
+  **pays what the previous one accrued** as a spendable claim; a small burn after a big one lowers what mines. Logs written
+  by the earlier version of this page (hash-chain epochs, cumulative capital) are not carried over: this deployment now
+  requires the proof of the work of an epoch.
 
 - **Catching up since last checkpoint**: connecting shows a real
   progress bar while a genuinely large backlog since your last local
