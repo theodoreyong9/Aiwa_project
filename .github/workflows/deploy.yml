@@ -30,10 +30,12 @@ jobs:
       - name: Assemble the static site
         run: |
           mkdir _site
-          cp index.html style.css manifest.webmanifest sw.js _site/
+          cp index.html bundle-provider.html sphere-loader.js style.css manifest.webmanifest sw.js _site/
           cp -r icons _site/icons
           cp -r examples _site/examples
           cp -r node_modules _site/node_modules
+      - name: Every local file the pages refer to is in the site
+        run: node scripts/check-site.mjs _site
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
         with:
