@@ -292,6 +292,31 @@ The cost it does pay is storage: one event per proof (about 1.7 KB), so the
 history that proves an age grows with the number of events, not of epochs
 ($k$ epochs fit in one event).
 
+**The mining events are one signed chain.** The work above started from the
+previous output alone, so the same stretch of proven work could be re-signed
+over any history: an action (a burn's commitment, a claim) could be left out,
+or two histories kept side by side, at no cost. In a deployment with `epochIterations`
+every progression, accrual and claim of $D$ therefore names, in its signed
+payload, the mining event it follows ($\mathrm{prev}$: an id, or none before the
+first), and the work starts from
+$x = H(\mathrm{domain}\,\|\,\mathrm{output}_{n-1}\,\|\,\mathrm{prev}) \bmod N$.
+Three consequences. An action cannot be left out: the epochs worked after it are
+bound to it and are refused without it. Proven work cannot be re-signed over
+another history: showing a history without an action means redoing, from that
+action on, the work the other one holds. And an action cannot be placed earlier
+than it was made (before, which of two concurrent events a reader folded first
+decided its epoch). The link is a signed field, not the event's `parents` (the
+log's heads — a checkpoint, a reception commitment — which pruning later removes).
+
+What it does *not* give is a proof that no other history exists: a domain can
+keep two, redoing the work, and show one. That is what a witness is for — anyone
+who holds an event $D$ signed can show it, and a reader that keeps it can require
+$D$'s next history to contain it (a fork then cannot be shown; this is the proof
+of §13.2, here used by a registry). Without any witness the chain alone is the
+protection, and its price is the work. A snapshot is also not "the current state":
+an action made after the last epoch shown, and followed by none, can be left
+out — that needs a clock, e.g. the head anchored on Solana.
+
 ## 7. Accrual — **updated**
 
 $$r(b, q, q_{\text{total}}, T) = \frac{b \cdot q^{\alpha}}{\left[\ln\left(q_{\text{total}}^{\,\beta(1-T)} + C\right)\right]^{\gamma}}$$
