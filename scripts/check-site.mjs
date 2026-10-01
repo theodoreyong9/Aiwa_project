@@ -1,12 +1,12 @@
 // Fails when a page of the assembled site refers to a local file the site does not contain.
 // A static `import './x.js'` that 404s stops the whole module script, so every button of the page does nothing:
-// that is what happened when sphere-loader.js was added to the repository but not to the deploy step.
+// that is what happened once, when a script was added to the repository but not to the deploy step.
 // Usage: node scripts/check-site.mjs _site
 import { readFileSync, existsSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 
 const site = process.argv[2] ?? '_site';
-const pages = ['index.html', 'bundle-provider.html'];
+const pages = ['index.html'];
 const references = (text) => [
   ...[...text.matchAll(/\bfrom\s+['"](\.{1,2}\/[^'"]+)['"]/g)].map((m) => m[1]),
   ...[...text.matchAll(/\bimport\(\s*['"](\.{1,2}\/[^'"]+)['"]\s*\)/g)].map((m) => m[1]),

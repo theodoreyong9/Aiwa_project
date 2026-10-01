@@ -58,7 +58,7 @@ then open `http://127.0.0.1:8080/index.html`.
 
 - **Wallet** — Connect; then the balance (spendable, claimable, **Claim**), your identity id and Solana address
   (Copy), **Burn**, **Send**, **Receive**, and History (read from the event log, never a separate ledger).
-- **Contract** — publish a contract, then the pinned YourMine sphere.
+- **Contract** — publish a contract: signed with your identity, content-addressed, immutable once published.
 - **Browse** — open a contract by address, or list what an identity published.
 
 Dark and light follow the system; a phone width is a single column, with no sideways scroll.
@@ -163,39 +163,9 @@ cached, and a later offline visit is served from it.
   moment you connect. Anything not matching that exact shape is ignored. Checked in Chromium on this
   very page (real connect, real form; 6.7 KB contract byte for byte; garbage and foreign fragments ignored).
 
-  **After publishing: a pinned YourMine sphere (`sphere-loader.js`, `bundle-provider.html`).**
-  Once a contract is published, the page offers the JS of a [YourMine](https://github.com/theodoreyong9/YourMinedApp)
-  sphere that *runs that very contract* — and holds no copy of it. The sphere (~9 KB) is pinned to three ids,
-  the contract's author, its address (`contract:<author>:<slug>`) and its **manifest id** — the hash of the
-  signed manifest, which only exists once the version is published, so the sphere can only be generated
-  afterwards. To run, it fetches the signed events, and runs the contract only if the manifest id is the pinned
-  one, the manifest's and each file's signature are valid (`verifyEvent` from `aiwa-core`), and each file's id is the
-  one the manifest lists; a changed character, a foreign version or a missing file is refused, with the reason
-  shown. Where the events come from, in order: what this device already kept (keyed by the manifest id,
-  checked again each time) → an optional **public export** (`https://…` address typed on this page, regenerating
-  the sphere with it: host the *Export signed events* file anywhere) → a button that opens `bundle-provider.html`
-  on this page's origin and asks for them (the wallet's log lives in this origin's IndexedDB, which a page on
-  another origin cannot read; the provider answers only a window that opened it, and the sphere accepts
-  the answer only from this page's origin). The contract runs inside the sphere's panel (a late import map +
-  a blob module), with a sandboxed iframe as fallback. The buttons: **Copy**, **Open YourMine's submission
-  field with this sphere** (YourMine's `#aiwa=1;<name>;<code>` address: the field arrives filled, nothing is
-  submitted for you) and **Export signed events**. Checked in Chromium 141 through the real wallet page, with the
-  real `aiwa-core`: pinned ids and no contract code in the sphere; YourMine's own `extractSphereField` reads
-  its name/icon/category/description; verified run from a public export and from this device (popup, then kept
-  by hash without a window); tampered export, other manifest and a contract this device never published are
-  refused; the provider opened by hand gives nothing; the post-publish panel at a phone's width (Pixel 7
-  emulation) — which showed the long address/manifest line widening the whole page, now wrapped. Read in
-  YourMine's source rather than run on its site (unreachable from here): its runtime already loads sphere code
-  through `blob:` script URLs and `import()`s from https, its repository carries no CSP, no import map, and
-  its submission validator checks file type, ownership, hash and signature, not the code — so nothing in the
-  sphere is of a kind it refuses. `raw.githubusercontent.com` answers with `access-control-allow-origin: *`,
-  so a raw GitHub address works as the public export. Not checked: inside the YourMine app itself, on a phone, and anyone *else* getting the contract without a public export (there is no
-  automatic first-peer rendezvous yet in `aiwa-platform`).
-
   [`examples/channel-contract.html`](examples/channel-contract.html) is a standalone example of a contract that is
   more than a one-shot transfer: it opens its own `aiwa-lib` `Channel` over its own `WebrtcTransport`, entirely
-  separate from whatever wallet published or opened it. It is a contract, not a feature of this page, and the example
-  Aiwa's Claude is told to read.
+  separate from whatever wallet published or opened it. It is a contract, not a feature of this page.
 
 ## What isn't verified here, and why
 
@@ -232,7 +202,7 @@ library. Two concrete, honest consequences:
   opaque, isolated origin, checked directly rather than assumed.
 
 Everything else above — connect/disconnect, claim, the tabs, History, the PWA manifest and service worker, the
-contract publish/browse flow and the pinned sphere — was exercised in Chromium through the real page (a desktop and a
+contract publish/browse flow — was exercised in Chromium through the real page (a desktop and a
 phone width, light and dark), with the real `aiwa-lib`. Send/Receive were exercised for their messages (nothing to
 send, garbage refused); the full value path needs a confirmed burn, which needs real Solana.
 
