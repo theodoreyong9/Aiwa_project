@@ -220,6 +220,9 @@ contract publish/browse flow — was exercised in Chromium through the real page
 phone width, light and dark), with the real `aiwa-lib`. Send/Receive were exercised for their messages (nothing to
 send, garbage refused); the full value path needs a confirmed burn, which needs real Solana.
 
+The repositories depend on each other by commit; the order to release them, the pins checker (`node scripts/check-pins.mjs`) and the
+format freeze are in [`RELEASING.md`](RELEASING.md).
+
 ## The whole path, once, for real — `scripts/e2e-devnet.mjs`
 
 Everything above is tested piece by piece (stand-in Solana, a real Chromium, real HTTP). One run was missing: the whole path on the
