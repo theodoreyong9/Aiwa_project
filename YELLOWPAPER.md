@@ -603,7 +603,9 @@ who writes two contradicting events can try variants until the one he wants has 
 accepted the other; it makes every reader agree on the outcome. What stays is a proof: two valid signatures by the same key on
 contradicting events show, to anyone, that it wrote both. Protection beyond that is a choice of the one who accepts: let the
 histories meet before relying on a payment from someone he does not trust, or require an anchor (the head of the signer's log
-inscribed on Solana: an objective clock — **not built**). A conflict that a checkpoint (§12.1) already absorbed stays as the
+inscribed on Solana: an objective clock — **not built**). An anchor needs a connection: it helps someone who can go online
+before handing over what he gives, and does nothing for an exchange that stays entirely offline — there, nothing prevents a signer
+who holds his key from writing two contradicting events; what remains is limiting the amount, trust, and the proof afterwards. A conflict that a checkpoint (§12.1) already absorbed stays as the
 checkpoint decided it, the same trade-off every checkpoint makes.
 
 ## 12. Explicit non-claims
