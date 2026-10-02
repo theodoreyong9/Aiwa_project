@@ -67,7 +67,7 @@ layer:
   content-addressed contract publishing, delegation, and bearer
   vouchers. Depends on nothing of its own — only `@noble/curves`,
   `@noble/hashes`, `@scure/bip39`, and an optional `@solana/web3.js`
-  peer dependency for the genesis commitment (§8). 402 passing tests
+  peer dependency for the genesis commitment (§8). 410 passing tests
   (including a real Rust build+run cross-check when a toolchain is available — §16.1).
 - **`aiwa-platform`** — distributed infrastructure with no protocol
   logic of its own: WebRTC transport, a replicator that syncs an
@@ -78,7 +78,7 @@ layer:
   API (`AIWA`) composing `aiwa-core`'s validation with `aiwa-platform`'s
   transport, and a smart-contract/token authoring SDK
   (`defineContract`/`Contract`/`signedAction`), the wallet's recovery (recovery phrase, backup, restore — §12.2) and the shared
-  panel every app mounts for it. 90 passing tests.
+  panel every app mounts for it. 95 passing tests.
 - **`AIWA_project`** — one concrete deployment: a single static page, no
   build step, no fixed server, wiring `aiwa-lib`'s API directly to DOM
   elements.
@@ -584,6 +584,28 @@ for a real DTN or dedicated-hardware transport later without touching
 reconciliation logic at all) nor an exchange rate between economies
 that grew apart.
 
+### 11.2 When two branches contradict each other
+
+A log is a graph: two events that do not know of each other are two branches, and that is ordinary (Alice and Bob each acting
+on their own). It matters only when they contradict — one claim spent twice, one voucher redeemed twice (§18), one claim id taken
+by two domains: a reader folds one and refuses the other. Folded in the order they *arrived*, two readers holding the same events
+could pick different winners and keep them (measured: the same voucher redeemed by two people, the two logs merged in either
+order, gave a different winner each time) — convergence failed even once everything had been exchanged.
+
+Readers now fold in one **canonical order** (`canonicalOrder`, `aiwa-core`): a topological order (a parent before its children) in
+which, among the events that can come next, the one with the smallest id goes first. The same events give the same order and so the
+same winner for every reader, whatever order they arrived in, whether folded in one go or one arrival at a time (a wallet that had
+already folded part of its log folds again from its last checkpoint when a concurrent branch arrives). It is not a signed format:
+no wallet is reset by it.
+
+**Agreement, not fairness.** The winner is the smaller id: arbitrary, not the first in time (nothing here has a clock). A signer
+who writes two contradicting events can try variants until the one he wants has the smaller id, so the rule does not protect whoever
+accepted the other; it makes every reader agree on the outcome. What stays is a proof: two valid signatures by the same key on
+contradicting events show, to anyone, that it wrote both. Protection beyond that is a choice of the one who accepts: let the
+histories meet before relying on a payment from someone he does not trust, or require an anchor (the head of the signer's log
+inscribed on Solana: an objective clock — **not built**). A conflict that a checkpoint (§12.1) already absorbed stays as the
+checkpoint decided it, the same trade-off every checkpoint makes.
+
 ## 12. Explicit non-claims
 
 Not solved: the human-identity oracle, physical-location verification,
@@ -1066,7 +1088,9 @@ never neither).
 This is real double-spend *detection* via reconciliation, not real-time
 *prevention*. Two people can each, honestly, offline, redeem the
 identical voucher; both believe they succeeded until their logs sync
-with each other or the issuer.
+with each other or the issuer. Once they have, every reader agrees on
+the winner (§11.2) — the smaller event id, which is arbitrary, not the
+first in time.
 
 ---
 
@@ -1143,6 +1167,7 @@ event log is the safe default for a contract's own internal state.
 | Hardware roots (§13.1) | `aiwa-core` | `src/hardware-attestation.js` |
 | Relative rate (§14) | `aiwa-core` | `src/relative-rate.js` |
 | Generous transfer (§15) | — | removed; see §15 |
+| Fold order of concurrent branches (§11.2) | `aiwa-core` + `aiwa-lib` | `aiwa-core/src/canonical-order.js`; `aiwa-lib/src/ancestors.js`, `src/wallet.js` (`_materializeWallet`) |
 | Single-file contract publishing (§16) | `aiwa-core` | `src/contract-registry.js` |
 | Delegation, Channel (§17) | `aiwa-core` + `aiwa-lib` | `aiwa-core/src/wallet.js`, `aiwa-lib/src/wallet.js` (`Channel`) |
 | Bearer vouchers (§18) | `aiwa-core` + `aiwa-lib` | `aiwa-core/src/wallet.js`, `aiwa-lib/src/wallet.js` (`issueVoucher`/`redeemVoucher`) |
@@ -1157,8 +1182,8 @@ event log is the safe default for a contract's own internal state.
 
 ## Status
 
-402 passing tests (`aiwa-core`, including a real Rust build+run
+410 passing tests (`aiwa-core`, including a real Rust build+run
 cross-check when a Rust toolchain is available), 85 (`aiwa-platform`),
-90 (`aiwa-lib`). Every package is independently, publicly testable;
+95 (`aiwa-lib`). Every package is independently, publicly testable;
 none depends on a shared, centrally-hosted server to run its own
 suite.
