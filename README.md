@@ -236,8 +236,11 @@ archive node, and is **brought back on a second device from the phrase alone**, 
 
 `npm run e2e:fake` runs the same steps against a stand-in Solana in the process: a dry run of the script (it found a real bug on its
 first run: a continuation re-sent a burn the verifier had already counted and got it refused). It proves the script, **not** the
-network — only `e2e:devnet` does, and it has not been run: Solana devnet is not reachable from where this was written. At the end it
-prints the part that needs GitHub (the YourMine pull request and its Action) as four steps to do by hand with the same phrase.
+network — only `e2e:devnet` does, and it has not been run: Solana devnet is not reachable from where this was written. With
+`--yourmine <YourMinedApp checkout>` it also runs YourMine's real `validate.js` (the script of the GitHub Action) on the evidence the
+wallet itself produced — against the same stand-in Solana, served as JSON-RPC — and restores the wallet from the baseline the
+registry would keep: `node scripts/e2e-devnet.mjs --fake --yourmine ~/YourMinedApp`. At the end it prints what still needs GitHub
+itself (the pull request and the Action's runner) as four steps to do by hand with the same phrase.
 On a phone: Termux, `pkg install nodejs git`, clone this repository, `npm install`, then the command.
 
 ## `aiwa.bundle.js` — the wallet as one file, for pages with no build step

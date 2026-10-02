@@ -9,13 +9,20 @@
 //   node scripts/e2e-devnet.mjs --sol 0.02 --epochs 5 --T 0.2
 //   node scripts/e2e-devnet.mjs --rpc https://my-rpc.example
 //   node scripts/e2e-devnet.mjs --phrase "twelve words …"   reuse a wallet (fund it once, then run again)
+//   node scripts/e2e-devnet.mjs --yourmine ~/YourMinedApp   also runs YourMine's real validate.js (the GitHub Action's script) on
+//                                                   this wallet's own evidence, and restores a wallet from the baseline it writes
 //   node scripts/e2e-devnet.mjs --fake              the same steps against a stand-in Solana in this process (a dry run
 //                                                   of the script itself; proves nothing about the network)
 //
 // Needs the project's dependencies (npm install). On a phone: Termux, `pkg install nodejs git`, clone the repository,
 // `npm install`, then the command above. Not covered: the YourMine pull request and its GitHub Action — printed at the end.
 
-import { mkdtempSync, rmSync } from 'node:fs';
+import { mkdtempSync, rmSync, mkdirSync, writeFileSync, readFileSync, copyFileSync, symlinkSync } from 'node:fs';
+import { createServer } from 'node:http';
+import { createHash } from 'node:crypto';
+import { createRequire } from 'node:module';
+import { spawn } from 'node:child_process';
+import { resolve } from 'node:path';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import * as web3 from '@solana/web3.js';
@@ -83,6 +90,16 @@ function fakeSolana() {
     },
     async confirmTransaction() { return { value: { err: null } }; },
     async getTransaction(signature) { return transactions.get(signature) ?? null; },
+    // the same transaction as the JSON-RPC answer @solana/web3.js parses (for a validator that runs as its own process)
+    rpcTransaction(signature) {
+      const t = transactions.get(signature);
+      if (!t) return null;
+      return {
+        slot: 5, blockTime: 1,
+        transaction: { signatures: [signature], message: { accountKeys: t.transaction.message.accountKeys, header: { numRequiredSignatures: 1, numReadonlySignedAccounts: 0, numReadonlyUnsignedAccounts: 1 }, recentBlockhash: '11111111111111111111111111111111', instructions: [{ programIdIndex: 2, accounts: [0, 1], data: '3Bxs4Bc3VYuGVB19' }] } },
+        meta: { err: null, fee: FEE, innerInstructions: [], logMessages: [], preBalances: t.meta.preBalances, postBalances: t.meta.postBalances, preTokenBalances: [], postTokenBalances: [], rewards: [] },
+      };
+    },
   };
 }
 
@@ -142,7 +159,8 @@ async function main() {
   // 5. verified as a registry verifies — Solana is asked for the burn by the verifier, not by the wallet. Before the claim:
   //    a claim is an action, it restarts the clock, and the figure a registry freezes is the one of the moment before it.
   step('5. Verified by a third party (aiwa-core assessSubmission, the call YourMine\'s validate.js makes)');
-  const first = await assessSubmission({ rewardParams: PARAMS, evidence: await aiwa.submissionEvidence(), domain: aiwa.identity.id, connection });
+  const prEvidence = await aiwa.submissionEvidence();   // what a submission made now would carry (kept for step 8)
+  const first = await assessSubmission({ rewardParams: PARAMS, evidence: prEvidence, domain: aiwa.identity.id, connection });
   check(first.ok && first.mining && first.rejections.length === 0, 'the evidence is accepted, nothing rejected', first.ok ? '' : first.reason);
   check(first.mining?.epoch === epochs, 'the verifier derives the same epoch', `epoch ${first.mining?.epoch}`);
   check(first.mining && first.mining.capital === afterBurn.capital, 'and the burn it confirmed with Solana is the capital', `${first.mining?.capital} SOL`);
@@ -196,7 +214,74 @@ async function main() {
     check(adopted.adopted && adopted.epoch === epochs, 'a registry\'s kept state also brings the mining back', `epoch ${adopted.epoch}`);
   } finally { node.closeAllConnections(); node.close(); rmSync(dir, { recursive: true, force: true }); }
 
+  // 8. YourMine's registry: the real validate.js (what the GitHub Action runs) on this wallet's own evidence
+  const yourmine = option('yourmine', null);
+  if (yourmine) await registryStep({ yourmine: resolve(yourmine.replace(/^~/, process.env.HOME ?? '~')), connection, keypair, address, prEvidence, first, phraseUsed: phrase });
+
   return finish(phrase, signature);
+}
+
+async function registryStep({ yourmine, connection, keypair, address, prEvidence, first, phraseUsed }) {
+  step('8. YourMine\'s registry: the real validate.js on this wallet\'s own evidence, then a wallet restored from what it keeps');
+  const requireFromYourmine = createRequire(join(yourmine, 'package.json'));
+  const nacl = requireFromYourmine('tweetnacl');
+  const dir = mkdtempSync(join(tmpdir(), 'aiwa-e2e-registry-'));
+  let rpcServer = null;
+  try {
+    for (const f of ['validate.js', 'solana-utils.js', 'aiwa-utils.js']) copyFileSync(join(yourmine, f), join(dir, f));
+    symlinkSync(join(yourmine, 'node_modules'), join(dir, 'node_modules'));
+    writeFileSync(join(dir, 'files.json'), '[]');
+    // what the page pushes: the signed YourMine event, the sphere, and the Aiwa evidence ({ ...evidence, wallet })
+    const nonce = `e2e-${Math.random().toString(36).slice(2, 12)}`;
+    const code = '/* a sphere */\nwindow.YM_S={};\n';
+    const filename = 'e2e.sphere.js';
+    const event = { action: 'create', filename, content_hash: createHash('sha256').update(code).digest('hex'), nonce, timestamp: Math.floor(Date.now() / 1000), score: 123, laps: 1, codeUrl: 'https://example.invalid/e2e.sphere.js', wip: false };
+    const signature = Buffer.from(nacl.sign.detached(Buffer.from(JSON.stringify(event)), keypair.secretKey)).toString('base64');
+    mkdirSync(join(dir, '_pr_content', 'events'), { recursive: true });
+    mkdirSync(join(dir, '_pr_content', 'aiwa'), { recursive: true });
+    writeFileSync(join(dir, '_pr_content', filename), code);
+    writeFileSync(join(dir, '_pr_content', 'events', `${nonce}.json`), JSON.stringify({ ...event, wallet: address, signature }));
+    writeFileSync(join(dir, '_pr_content', 'aiwa', `${nonce}.json`), JSON.stringify({ ...prEvidence, wallet: address }));
+
+    let rpcUrl = rpc;
+    if (fake) {   // the stand-in Solana, answering the validator over HTTP the way a real RPC would
+      rpcServer = createServer((req, res) => {
+        let body = '';
+        req.on('data', (c) => { body += c; });
+        req.on('end', () => {
+          const call = JSON.parse(body);
+          const result = call.method === 'getTransaction' ? connection.rpcTransaction(call.params[0]) : null;
+          res.writeHead(200, { 'content-type': 'application/json' });
+          res.end(JSON.stringify({ jsonrpc: '2.0', id: call.id, result }));
+        });
+      });
+      await new Promise((r) => rpcServer.listen(0, '127.0.0.1', r));
+      rpcUrl = `http://127.0.0.1:${rpcServer.address().port}`;
+    }
+    const ran = await new Promise((done) => {
+      const child = spawn('node', ['validate.js'], { cwd: dir, env: { ...process.env, GH_ACTOR: 'e2e', PR_CONTENT_DIR: '_pr_content', SOLANA_RPC: rpcUrl } });
+      let out = '';
+      child.stdout.on('data', (c) => { out += c; });
+      child.stderr.on('data', (c) => { out += c; });
+      child.on('close', (status) => done({ status, out }));
+    });
+    check(ran.status === 0, 'validate.js accepts the pull request', ran.status === 0 ? '' : ran.out.split('\n').filter(Boolean).slice(-2).join(' | '));
+    if (ran.status !== 0) return;
+    const result = JSON.parse(readFileSync('/tmp/validation_result.json', 'utf8'));
+    check(Math.abs(result.files[0].score - first.ranking.score) < 1e-12 && result.files[0].laps === first.ranking.laps, 'its score and laps are the validator\'s own figure, not the 123 the event wrote', `score ${result.files[0].score}, laps ${result.files[0].laps}`);
+    check(result.aiwaBaseline && result.aiwaBaseline.epoch === first.baseline.epoch && result.aiwaBaseline.head === first.baseline.head, 'the baseline it hands to merge.js is the same state at the same chain head');
+    // what merge.js writes (aiwa-state.json on main), read back as the wallet reads it, and a wallet restored from it
+    const kept = JSON.parse(JSON.stringify({ [address]: { ...result.aiwaBaseline, validatedAt: Math.floor(Date.now() / 1000) } }));
+    const lost = new AIWA({ rewardParams: PARAMS });
+    await lost.connect({ mnemonic: phraseUsed });
+    const adopted = await lost.adoptState(kept[address].state);
+    check(adopted.adopted && adopted.epoch === first.baseline.epoch, 'a wallet that lost everything is restored from the file the registry keeps (aiwa-state.json)', `epoch ${adopted.epoch}`);
+    const again = await lost.advanceProgress();
+    check(Boolean(again.eventId), 'and carries on from the registry\'s chain head', `epoch ${again.epoch}`);
+  } finally {
+    rpcServer?.closeAllConnections?.(); rpcServer?.close();
+    rmSync(dir, { recursive: true, force: true });
+  }
 }
 
 function finish(phrase, signature) {
