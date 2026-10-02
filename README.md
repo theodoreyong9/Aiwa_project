@@ -1,5 +1,24 @@
 # AIWA_project
 
+> **New here? Start with [EXPLAINED.md](EXPLAINED.md)** (English) or **[EXPLICATION.md](EXPLICATION.md)** (français): what Aiwa is,
+> how it works from the key to the double spend, what is new and what is not solved. The formal protocol is in the
+> [yellow paper](YELLOWPAPER.md); this README describes the wallet page.
+
+## What Aiwa is, in one minute
+
+Everyone keeps **their own notebook** of signed events; there is no shared ledger. People show each other their notebooks and each one
+checks them by themselves. Two layers, independent of each other:
+
+- **The foundation** — identity (a key from 12 words), the notebook, transfers, contracts. Free: **no burn**, and no network required;
+  events travel by any means (file, QR, GitHub, a direct connection).
+- **Accrual** — creating new AIWA, from verifiable sequential work, gated by an irreversible SOL burn. The **only** thing that needs one.
+
+A branch (two events that do not know of each other) is ordinary; a conflict (one claim spent twice) is refused in every state and every
+reader picks the same winner. What cannot be prevented offline is that someone accepts a payment that is later overruled: see
+[EXPLAINED.md](EXPLAINED.md#3-branches-conflicts-and-double-spending).
+
+## This page
+
 The AIWA wallet page: connect, burn, claim, send, receive (QR), contracts, browse. A single static page
 (`index.html`), no build step, no server: it opens directly against
 [`aiwa-lib`](https://github.com/theodoreyong9/Aiwa_lib), which composes

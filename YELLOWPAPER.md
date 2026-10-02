@@ -3,6 +3,8 @@
 **Causal Coordination and Local Value Accrual for Partition-Tolerant Networks**
 Version 3.0 — formal specification, reference implementation
 
+*Not a specialist? Read [EXPLAINED.md](EXPLAINED.md) first ([EXPLICATION.md](EXPLICATION.md) en français): the same protocol in plain words.*
+
 This is a revision of the original AIWA_chain Yellow Paper (v2.0), not a
 copy of it — every section below was checked against the current
 codebase, not carried over on trust. Sections marked **updated** describe
