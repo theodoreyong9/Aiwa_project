@@ -8,8 +8,12 @@ copy of it — every section below was checked against the current
 codebase, not carried over on trust. Sections marked **updated** describe
 a mechanism that was redesigned, not merely relocated, during the split
 into four repositories — the formula or field shape genuinely changed.
-Two sections are new: Delegation (§17) and Bearer vouchers (§18), neither
-of which existed in v2.0. A first pass at this revision condensed §11.1,
+Three sections are new: Delegation (§17), Bearer vouchers (§18) and, after
+this revision, Where a wallet's history lives (§12.2): recovery phrase, backup,
+archive nodes. §6.2 and §7.1–7.2 also gained, since v2.0, succinct progression
+(an epoch is a fixed amount of work with a proof checked in milliseconds), the
+signed chain of a domain's mining events, and the mining state a third party
+reads without trusting the domain — none of which existed in v2.0. A first pass at this revision condensed §11.1,
 §12.1, §15.1, §15.2, and §16.1 out entirely without flagging the omission
 — caught on review and restored here, updated rather than pasted back
 unchanged: §12.1 originally documented a real regression (incremental
@@ -63,17 +67,18 @@ layer:
   content-addressed contract publishing, delegation, and bearer
   vouchers. Depends on nothing of its own — only `@noble/curves`,
   `@noble/hashes`, `@scure/bip39`, and an optional `@solana/web3.js`
-  peer dependency for the genesis commitment (§8). 310 passing tests
-  (309 pure-JS, plus a real Rust build+run cross-check — §16.1).
+  peer dependency for the genesis commitment (§8). 402 passing tests
+  (including a real Rust build+run cross-check when a toolchain is available — §16.1).
 - **`aiwa-platform`** — distributed infrastructure with no protocol
   logic of its own: WebRTC transport, a replicator that syncs an
   `aiwa-core` event log between peers, capability-gated data stores, a
-  graph materializer, and multi-file bundle publishing (§19). 72
-  passing tests.
+  graph materializer, multi-file bundle publishing (§19) and the **archive node** (§12.2), the always-on holder of wallets'
+  backups. 85 passing tests.
 - **`aiwa-lib`** — the public, developer-facing facade. A real wallet
   API (`AIWA`) composing `aiwa-core`'s validation with `aiwa-platform`'s
   transport, and a smart-contract/token authoring SDK
-  (`defineContract`/`Contract`/`signedAction`). 36 passing tests.
+  (`defineContract`/`Contract`/`signedAction`), the wallet's recovery (recovery phrase, backup, restore — §12.2) and the shared
+  panel every app mounts for it. 90 passing tests.
 - **`AIWA_project`** — one concrete deployment: a single static page, no
   build step, no fixed server, wiring `aiwa-lib`'s API directly to DOM
   elements.
@@ -609,8 +614,9 @@ independently re-derive that state from genesis; they trade full
 independent verifiability for a real, signed assertion by the domain's
 own key about its own past — the identical tradeoff Ethereum's own
 weak-subjectivity checkpoints make, not a flaw specific to this
-implementation. Checkpointing is opt-in, not automatic: a domain that
-never calls it keeps the original unbounded growth exactly as before.
+implementation. At the protocol level checkpointing is opt-in: a domain
+that never calls it keeps the original unbounded growth exactly as
+before (the wallet page and YourMine run it every five minutes).
 
 **Wallet materialization — bounded via incremental folding.**
 `materializeWallet` now accepts an optional `baseState` to fold new
@@ -628,7 +634,8 @@ event (an ordinary `recordCommitment()`, unrelated to checkpointing at
 all) became the log's head in between, permanently halting
 `claimable()`'s growth from then on — fixed with a new
 `progressionParents(heads, lastId)` helper every real progression-event
-builder must route through; (3) that fix, in turn, required the
+builder must route through (in a deployment that fixes the work of an epoch, §6.2, the chain is instead the signed
+`previous` field, which also removes this dependency on `parents`); (3) that fix, in turn, required the
 incremental cache's own exclusion boundary to track the real, growing
 set of already-covered ids rather than just the latest heads, since the
 new helper's extra parent edge can reach past a heads-only boundary. No
@@ -651,6 +658,33 @@ mean redesigning that handshake, left as future work.
 Together these three real fixes close every scalability gap this
 section originally documented as open — each one found the next while
 being built, none assumed correct without a dedicated test proving it.
+
+### 12.2 Where a wallet's history lives, and how it comes back
+
+A wallet is a key plus a journal of signed events (its burns, epochs, claims, transfers). The key is a BIP39 **recovery
+phrase** (12 words, `m/44'/501'/0'/0'`: the same words give the same address in a Solana wallet): a new identity is made
+from a fresh one and shown on request (`aiwa.recoveryPhrase`); a wallet imported as a raw key has no phrase, so its private
+key is shown instead. The journal is not in the phrase. A blockchain recovers it for free because every node keeps all of
+it; here nobody replicates everything (§12.1) — an event is kept by its owner and by whoever received it — so after a lost
+device the journal must come from somewhere:
+
+- **A backup** (`exportBackup` / `importBackup`): a *checkpoint* (§12.1) — the wallet's whole state signed by its own key —
+  small however long the history, restorable after logging in with the phrase. Refused if it is of another identity, or no
+  further along than the wallet is: it can never roll a wallet back.
+- **A registry's baseline** (`adoptState`): an application that kept the state it derived from a wallet's submissions (§7.2)
+  can hand it back; it holds what the registry saw, not value received from others.
+- **An archive node** (`aiwa-platform`): an always-on program anyone can run, that keeps per wallet the latest backup. Only the
+  owner of a key can write its backup (the checkpoint must verify and be authored by the domain), the most recent wins,
+  reads are public (a backup holds no secret), sizes and rates are limited. A wallet pushes its backup to the nodes it
+  knows whenever it changed and asks them for it after a loss; it needs no trust in a node (a backup is signed by the
+  wallet's key), which can only withhold or forget — hence several. This is the seed node of the bootstrap problem in its
+  simplest form.
+- **Peers** (`joinNetwork`): the replicator hands back what peers that received your events hold, as far as you have any
+  connected.
+
+Same tradeoff as every checkpoint: whoever only sees a backup trusts its signature instead of re-deriving the history from
+genesis. **Not claimed:** a wallet with no backup, no node and no peer that lost its device loses its journal (the burns stay
+on Solana; the key stays in the phrase).
 
 ## 13. Causal Tick
 
@@ -1092,6 +1126,12 @@ event log is the safe default for a contract's own internal state.
 | Denomination (§10) | `aiwa-core` | `src/units.js` |
 | Mirror (§4) | `aiwa-core` | `src/mirror.js` |
 | Checkpoints, storage bound (§12.1) | `aiwa-core` | `src/checkpoint.js` |
+| Recovery phrase (§12.2) | `aiwa-core` + `aiwa-lib` | `src/solana-wallet.js` (`generateBip39Mnemonic`), `aiwa-lib/src/wallet.js` (`recoveryPhrase`) |
+| Backup, restore, adopt a state (§12.2) | `aiwa-lib` | `src/wallet.js` (`exportBackup`, `importBackup`, `adoptState`) |
+| Archive node (§12.2) | `aiwa-platform` + `aiwa-lib` | `src/archive.js`, `src/archive-server.js`, `node/aiwa-node.js`; `aiwa-lib/src/wallet.js` (`archiveNow`, `restoreFromArchive`, `startAutoArchive`) |
+| Recovery panel (§12.2) | `aiwa-lib` | `src/safety-panel.js` (`mountWalletSafety`) |
+| Mining state, evidence an app takes (§7.2, §6.2) | `aiwa-core` | `src/mining-state.js`, `src/submission.js` |
+| Succinct progression (§6.2) | `aiwa-core` | `src/succinct-vdf.js`, `src/progression.js` |
 | Causal Tick (§13) | `aiwa-core` | `src/causal-tick.js`, `src/weighted-median.js` |
 | Hardware roots (§13.1) | `aiwa-core` | `src/hardware-attestation.js` |
 | Relative rate (§14) | `aiwa-core` | `src/relative-rate.js` |
@@ -1110,8 +1150,8 @@ event log is the safe default for a contract's own internal state.
 
 ## Status
 
-323 passing tests (`aiwa-core`, including a real Rust build+run
-cross-check when a Rust toolchain is available), 77 (`aiwa-platform`),
-41 (`aiwa-lib`). Every package is independently, publicly testable;
+402 passing tests (`aiwa-core`, including a real Rust build+run
+cross-check when a Rust toolchain is available), 85 (`aiwa-platform`),
+90 (`aiwa-lib`). Every package is independently, publicly testable;
 none depends on a shared, centrally-hosted server to run its own
 suite.
