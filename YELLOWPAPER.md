@@ -401,7 +401,14 @@ the state it derived earlier folds only the new events.
 
 $$b_D = \sum_{\text{valid burns}} \mathrm{lamports}_i$$
 
-Activation requires an irreversible SOL burn to Solana's incinerator
+**What the burn is for, and what it is not for.** The burn is the entry price of *accrual* (§7) and of nothing
+else: it is what lets a domain commit capital $b$, and so create value. An identity, its log, progression (§5),
+Mirror (§4), receiving and transferring claims (§9), contracts and the rest need none — the reducers check no burn
+there, and a domain that never burned simply has nothing to claim (`no committed capital for this domain`). Outside
+accrual a burn counts in exactly one place: it is the weight of an observer in the weighted median of §13. "Activation"
+below, like `identity-cost.js` in the code, is the activation of accrual — a name inherited from the earlier design.
+
+Accrual requires an irreversible SOL burn to Solana's incinerator
 address, verified from a finalized transaction record. Cumulative
 across every valid burn.
 
