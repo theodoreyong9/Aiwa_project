@@ -12,7 +12,7 @@ const dir = mkdtempSync(join(tmpdir(), 'aiwa-bundle-'));
 const entry = join(dir, 'entry.js');
 const root = resolve('node_modules');
 writeFileSync(entry, `
-export { AIWA, mountWalletSafety, fromUnits, toUnits } from ${JSON.stringify(join(root, 'aiwa-lib/src/index.js'))};
+export { AIWA, mountWalletSafety, loadArchiveNodes, saveArchiveNodes, fromUnits, toUnits } from ${JSON.stringify(join(root, 'aiwa-lib/src/index.js'))};
 export { reward, miningState, rankingFigure, commitmentPriceLamports, MAX_PATIENCE_RATE, assessMining, generateBip39Mnemonic, validateBip39Mnemonic } from ${JSON.stringify(join(root, 'aiwa-core/src/index.js'))};
 `);
 try {

@@ -163,7 +163,7 @@
 </div><!-- /.wrap -->
 
 <script type="module">
-import { AIWA, mountWalletSafety, encodeOfflineBundle, decodeOfflineBundle, fromUnits } from 'aiwa-lib';
+import { AIWA, mountWalletSafety, loadArchiveNodes, encodeOfflineBundle, decodeOfflineBundle, fromUnits } from 'aiwa-lib';
 import { publishBundle, readBundle, latestBundle, listBundlesByAuthor } from 'aiwa-platform';
 
 // A deployment chooses its own economic parameters; these are the placeholder values aiwa-core's own tests use.
@@ -420,6 +420,8 @@ $('btn-connect').addEventListener('click', async () => {
     mountSafety();
     aiwa.startProgressLoop({ onError: (err) => console.error('progress loop:', err) });
     aiwa.startAutoCheckpoint({ onError: (err) => console.error('auto-checkpoint:', err) });
+    // The backup goes to the archive nodes the user added (Recovery → Archive nodes), whenever the wallet changed.
+    aiwa.startAutoArchive({ nodes: () => loadArchiveNodes(), onError: (err) => console.error('auto-archive:', err) });
     displayRefreshTimer = setInterval(() => { if (aiwa) refreshLocalState(); }, 5000);
   } catch (err) {
     showError($('connect-error'), err.message);

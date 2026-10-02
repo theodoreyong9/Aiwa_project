@@ -96,7 +96,10 @@ cached, and a later offline visit is served from it.
   moment you reconnect with the same phrase.
 - **Recovery** (aiwa-lib's own panel, the same in every app with an Aiwa wallet): *Show recovery phrase* (only when
   asked for, copyable — write it down, it is the only way to log back in), *Download backup* (a small file: the wallet's
-  state signed by its key) and *Restore from backup file* (after logging in with the phrase on another device).
+  state signed by its key), *Restore from backup file* (after logging in with the phrase on another device) and
+  **Archive nodes**: add the address of a node (aiwa-platform's `node/aiwa-node.js`, runnable on a phone under Termux, see its
+  README) and the wallet keeps its backup there by itself (at most every 5 minutes, when it changed); after a lost device,
+  log in with the phrase and *Restore from the nodes*. The list of nodes is kept in this browser.
 
 - **Address / Solana balance / Burn**: the real address is always
   shown once connected. Solana balance and burn both make a real
