@@ -220,6 +220,23 @@ contract publish/browse flow — was exercised in Chromium through the real page
 phone width, light and dark), with the real `aiwa-lib`. Send/Receive were exercised for their messages (nothing to
 send, garbage refused); the full value path needs a confirmed burn, which needs real Solana.
 
+## The whole path, once, for real — `scripts/e2e-devnet.mjs`
+
+Everything above is tested piece by piece (stand-in Solana, a real Chromium, real HTTP). One run was missing: the whole path on the
+real network. `npm run e2e:devnet` does it: a wallet from a fresh phrase is funded on Solana devnet (faucet airdrop, or by hand if the
+faucet refuses — it prints the address and waits), **burns** `--sol` (default 0.01 devnet SOL, worth nothing) at `--T`, mines
+`--epochs` epochs of the deployment's own work (100 000 squarings and a proof each; it prints the seconds per epoch, which is what a
+phone will cost), is **verified the way a registry verifies it** (aiwa-core's `assessSubmission` asking Solana itself for the burn —
+the call YourMine's `validate.js` makes), claims, is verified again as a continuation of what the verifier kept, is backed up to an
+archive node, and is **brought back on a second device from the phrase alone**, which carries on and is accepted again. Options:
+`--sol`, `--T`, `--epochs`, `--rpc URL`, `--phrase "…"` (reuse a funded wallet).
+
+`npm run e2e:fake` runs the same steps against a stand-in Solana in the process: a dry run of the script (it found a real bug on its
+first run: a continuation re-sent a burn the verifier had already counted and got it refused). It proves the script, **not** the
+network — only `e2e:devnet` does, and it has not been run: Solana devnet is not reachable from where this was written. At the end it
+prints the part that needs GitHub (the YourMine pull request and its Action) as four steps to do by hand with the same phrase.
+On a phone: Termux, `pkg install nodejs git`, clone this repository, `npm install`, then the command.
+
 ## `aiwa.bundle.js` — the wallet as one file, for pages with no build step
 
 The deploy builds `aiwa.bundle.js` (esbuild, `scripts/build-bundle.mjs`, ~170 KB): `AIWA` and `mountWalletSafety` (aiwa-lib) and, from

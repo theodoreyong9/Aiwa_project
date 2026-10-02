@@ -1,7 +1,7 @@
 {
   "name": "aiwa-project",
   "version": "0.1.0",
-  "description": "A real wallet interface for AIWA: connect, balance, burn, claim, send/receive — including fully offline via QR/share, and a real delegated \"sign once, click many times\" channel — built on aiwa-lib.",
+  "description": "A real wallet interface for AIWA: connect, balance, burn, claim, send/receive \u2014 including fully offline via QR/share, and a real delegated \"sign once, click many times\" channel \u2014 built on aiwa-lib.",
   "private": true,
   "type": "module",
   "license": "MIT",
@@ -9,6 +9,11 @@
     "aiwa-lib": "git+https://github.com/theodoreyong9/Aiwa_lib.git"
   },
   "devDependencies": {
+    "@solana/web3.js": "^1.99.0",
     "esbuild": "^0.25.12"
+  },
+  "scripts": {
+    "e2e:fake": "node scripts/e2e-devnet.mjs --fake",
+    "e2e:devnet": "node scripts/e2e-devnet.mjs"
   }
 }
