@@ -41,6 +41,7 @@
   <section class="card" id="connect-section">
     <input id="mnemonic" type="text" placeholder="Recovery phrase (empty creates a new identity)" autocomplete="off" aria-label="Recovery phrase, optional">
     <button id="btn-connect" class="primary wide">Connect</button>
+    <div class="muted">New here? Leave it empty: a 12-word recovery phrase is made for you and shown once you are connected. Write it down — it is the only way to log back in.</div>
     <div id="connect-error" class="error"></div>
   </section>
 
@@ -63,6 +64,11 @@
     <section class="card ids">
       <div class="idrow"><span>Identity</span><code id="out-identity-id"></code><button type="button" class="icon" data-copy="out-identity-id">Copy</button></div>
       <div class="idrow"><span>Solana</span><code id="out-address"></code><button type="button" class="icon" data-copy="out-address">Copy</button></div>
+    </section>
+
+    <section class="card" id="safety-card">
+      <h2>Recovery</h2>
+      <div id="safety-panel"></div>
     </section>
 
     <section class="card">
@@ -157,7 +163,7 @@
 </div><!-- /.wrap -->
 
 <script type="module">
-import { AIWA, encodeOfflineBundle, decodeOfflineBundle, fromUnits } from 'aiwa-lib';
+import { AIWA, mountWalletSafety, encodeOfflineBundle, decodeOfflineBundle, fromUnits } from 'aiwa-lib';
 import { publishBundle, readBundle, latestBundle, listBundlesByAuthor } from 'aiwa-platform';
 
 // A deployment chooses its own economic parameters; these are the placeholder values aiwa-core's own tests use.
@@ -411,6 +417,7 @@ $('btn-connect').addEventListener('click', async () => {
       if (current >= total) setTimeout(() => { $('sync-progress').hidden = true; }, 500);
     };
     await refreshLocalState();
+    mountSafety();
     aiwa.startProgressLoop({ onError: (err) => console.error('progress loop:', err) });
     aiwa.startAutoCheckpoint({ onError: (err) => console.error('auto-checkpoint:', err) });
     displayRefreshTimer = setInterval(() => { if (aiwa) refreshLocalState(); }, 5000);
@@ -419,7 +426,19 @@ $('btn-connect').addEventListener('click', async () => {
   }
 });
 
+// Recovery (phrase, backup, restore) is aiwa-lib's own panel, the same in every app with an Aiwa wallet.
+let safety = null;
+function mountSafety() {
+  safety?.unmount();
+  safety = mountWalletSafety($('safety-panel'), aiwa, {
+    classes: { button: 'icon', box: 'phrase', note: 'muted' },
+    onRestored: () => refreshLocalState(),
+  });
+}
+
 $('btn-disconnect').addEventListener('click', async () => {
+  safety?.unmount();
+  safety = null;
   await aiwa.disconnect(); // also stops the progress loop
   clearInterval(displayRefreshTimer);
   displayRefreshTimer = null;

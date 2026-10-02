@@ -90,10 +90,13 @@ cached, and a later offline visit is served from it.
 
 ## What's real here
 
-- **Connect / disconnect**: derives or generates a real Ed25519 keypair — from a BIP39 recovery phrase, or freshly
-  generated if none is given — that serves as BOTH your Solana address and your AIWA identity (same curve).
-  Disconnecting clears it from memory only; your local data (a persistent IndexedDB database) reloads the moment you
-  reconnect with the same key.
+- **Connect / disconnect**: derives a real Ed25519 keypair from a BIP39 recovery phrase — or, if you give none,
+  creates a new identity from a fresh 12-word phrase — that serves as BOTH your Solana address and your AIWA identity
+  (same curve). Disconnecting clears it from memory only; your local data (a persistent IndexedDB database) reloads the
+  moment you reconnect with the same phrase.
+- **Recovery** (aiwa-lib's own panel, the same in every app with an Aiwa wallet): *Show recovery phrase* (only when
+  asked for, copyable — write it down, it is the only way to log back in), *Download backup* (a small file: the wallet's
+  state signed by its key) and *Restore from backup file* (after logging in with the phrase on another device).
 
 - **Address / Solana balance / Burn**: the real address is always
   shown once connected. Solana balance and burn both make a real
@@ -216,8 +219,8 @@ send, garbage refused); the full value path needs a confirmed burn, which needs 
 
 ## `aiwa.bundle.js` — the wallet as one file, for pages with no build step
 
-The deploy builds `aiwa.bundle.js` (esbuild, `scripts/build-bundle.mjs`, ~170 KB): `AIWA` (aiwa-lib) and, from
-aiwa-core, `reward`, `miningState`, `rankingFigure`, `commitmentPriceLamports`, `MAX_PATIENCE_RATE`, `assessMining`.
+The deploy builds `aiwa.bundle.js` (esbuild, `scripts/build-bundle.mjs`, ~170 KB): `AIWA` and `mountWalletSafety` (aiwa-lib) and, from
+aiwa-core, `reward`, `miningState`, `rankingFigure`, `commitmentPriceLamports`, `MAX_PATIENCE_RATE`, `assessMining`, `generateBip39Mnemonic`, `validateBip39Mnemonic`.
 A page that cannot carry an import map loads it with
 `await import('https://theodoreyong9.github.io/Aiwa_project/aiwa.bundle.js')` — YourMine does. Checked in Chromium on a
 page with no import map: connect, commit, two epochs with their proof, `mining()`; and `reward()` (the front-end

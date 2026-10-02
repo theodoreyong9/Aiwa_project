@@ -198,6 +198,18 @@ button.icon { height: 26px; padding: 0 8px; font-size: 12px; background: transpa
 #qr canvas { max-width: 100%; height: auto !important; border-radius: 8px; background: #fff; padding: 6px; }
 video { width: 100%; border-radius: 9px; }
 
+/* ---------- recovery phrase ---------- */
+
+.phrase {
+  padding: 10px 12px;
+  border-radius: 9px;
+  background: var(--bg);
+  border: 1px dashed var(--border);
+  font: 13px/1.6 ui-monospace, SFMono-Regular, Menlo, monospace;
+  overflow-wrap: anywhere;
+  user-select: all;
+}
+
 /* ---------- history ---------- */
 
 summary { cursor: pointer; font-weight: 700; font-size: 11.5px; letter-spacing: 0.07em; text-transform: uppercase; color: var(--muted); }
